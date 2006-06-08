@@ -1,0 +1,5 @@
+# $Id$
+
+Python C module interface to memcached.
+
+Build and install: python setup.py install
