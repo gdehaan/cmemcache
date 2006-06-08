@@ -4,6 +4,7 @@
 #
 
 """
+Test for cmemcache module.
 """
 
 __version__ = "$Revision$"
@@ -42,6 +43,9 @@ def main():
             return 0
 
     test_setget('bla', 'bli')
+
+    # make sure zero delimitation characters are ignored in values.
+    test_setget('blabla', 'bli\000bli')
 
 if __name__ == '__main__':
     main()
