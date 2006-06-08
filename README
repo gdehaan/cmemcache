@@ -1,0 +1,3 @@
+# $Id$
+
+Python C module interface to memcached.
