@@ -14,12 +14,12 @@ typedef struct
     int debug;
 } CmemcacheObject;
 
-#ifndef NDEBUG
-#define debug(args) printf args
-#define debug_def(args) args
-#else
+#ifdef NDEBUG
 #define debug(args)
 #define debug_def(args)
+#else
+#define debug(args) printf args
+#define debug_def(args) args
 #endif
 
 //----------------------------------------------------------------------------------------
@@ -561,8 +561,10 @@ initcmemcache(void)
 {
     PyObject* m;
 
-#ifndef NDEBUG
-    /* turn off info and notice */
+    debug(("initcmemcache\n"));
+    
+#ifdef NDEBUG
+    /* turn off some message/errors */
     mc_err_filter_del(MCM_ERR_LVL_INFO);
     mc_err_filter_del(MCM_ERR_LVL_NOTICE);
     mc_err_filter_del(MCM_ERR_LVL_WARN);
@@ -581,6 +583,6 @@ initcmemcache(void)
 
 /*
   Local Variables: ***
-  compile-command: "cd ~/p/cmemcache; python setup.py install --home=~/p/packages && python test/test.py" ***
+  compile-command: "cd .; python setup.py build_ext -i && python test.py" ***
   End: ***
 */  
