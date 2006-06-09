@@ -1,5 +1,11 @@
+#
 # $Id$
+#
 
 Python C module interface to memcached.
+
+Requirements:
+
+  - libmemcache
 
 Build and install: python setup.py install
