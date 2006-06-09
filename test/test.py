@@ -10,38 +10,36 @@ Test for cmemcache module.
 __version__ = "$Revision$"
 __author__ = "$Author$"
 
+import unittest
+
+#-----------------------------------------------------------------------------------------
+#
+def to_s(val):
+    """
+    Convert val to string.
+    """
+    if not isinstance(val, str):
+        return "%s (%s)" % (val, type(val))
+    return val
+
+#-----------------------------------------------------------------------------------------
+#
+def test_setget(mc, key, val, checkf):
+    """
+    test set and get in one go
+    """
+    print "Testing set/get {'%s': %s} ..." % (to_s(key), to_s(val)),
+    mc.set(key, val)
+    newval = mc.get(key)
+    checkf(val, newval)
+    
 #-------------------------------------------------------------------------------
 #
-def main():
-    import optparse
-    parser = optparse.OptionParser(__doc__.strip())
-    opts, args = parser.parse_args()
+class TestCmemcache( unittest.TestCase ):
 
     servers = ["127.0.0.1:11211"]
 
-    def to_s(val):
-        """
-        Convert val to string.
-        """
-        if not isinstance(val, str):
-            return "%s (%s)" % (val, type(val))
-        return val
-
-    def test_setget(mc, key, val):
-        """
-        test set and get in one go
-        """
-        print "Testing set/get {'%s': %s} ..." % (to_s(key), to_s(val)),
-        mc.set(key, val)
-        newval = mc.get(key)
-        if newval == val:
-            print "OK"
-            return 1
-        else:
-            print "FAIL"
-            return 0
-    
-    def test(mcm, ok):
+    def _test(self, mcm, ok):
         """
         The test.
 
@@ -57,66 +55,83 @@ def main():
 
         print 'testing', mcm
         # setup
-        mc = mcm.Client(servers,debug=1)
+        mc = mcm.Client(self.servers, debug=1)
 
-        print 'blo "%s"' % mc.get('blo')
-        assert(mc.set('blo', 'blu') == ok)
-        assert(mc.get('blo'), 'blu')
+        self.assert_(mc.set('blo', 'blu') == ok)
+        self.failUnlessEqual(mc.get('blo'), 'blu')
         mc.replace('blo', 'replace')
-        assert(mc.get('blo'), 'replace')
+        self.failUnlessEqual(mc.get('blo'), 'replace')
         mc.add('blo', 'will be NOT set')
-        assert(mc.get('blo'), 'replace')
+        self.failUnlessEqual(mc.get('blo'), 'replace')
 
         mc.delete('blo')
-        assert(mc.get('blo'), '')
+        self.failUnlessEqual(mc.get('blo'), None)
         mc.replace('blo', 'will NOT be set')
-        assert(mc.get('blo'), '')
+        self.failUnlessEqual(mc.get('blo'), None)
         mc.add('blo', 'will be set')
-        assert(mc.get('blo'), 'will be set')
+        self.failUnlessEqual(mc.get('blo'), 'will be set')
         
-        assert(mc.delete('blo') != 0)
-        assert(mc.get('blo'), None)
+        mc.delete('blo')
+        self.failUnlessEqual(mc.get('blo'), None)
         
         mc.set('number', '5')
-        assert(mc.incr('number', 3), 8)
-        assert(mc.decr('number', 2), 6)
+        self.failUnlessEqual(mc.get('number'), '5')
+        self.failUnlessEqual(mc.incr('number', 3), 8)
+        self.failUnlessEqual(mc.decr('number', 2), 6)
+        self.failUnlessEqual(mc.get('number'), '6')
 
         mc.set('blo', 'bli')
+        self.failUnlessEqual(mc.get('blo'), 'bli')
         d = mc.get_multi(['blo', 'number', 'doesnotexist'])
         print 'd', d
-        assert(d['blo'] == 'bli')
-        assert(d['number'] == '6')
-        assert(not d.has_key('doesnotexist'))
-        
+        self.failUnlessEqual(d['blo'], 'bli')
+        self.failUnlessEqual(d['number'], '6')
+        self.assert_(not d.has_key('doesnotexist'))
+
         # make sure zero delimitation characters are ignored in values.
-        test_setget(mc, 'blabla', 'bli\000bli')
+        test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
         
         # set_servers to none
         mc.set_servers([])
         try:
-            # memcache does not support to 0 server case
+            # memcache does not support the 0 server case
             mc.set('bli', 'bla')
         except ZeroDivisionError:
             pass
         else:
-            assert(mc.get('bli'), '')
+            self.failUnlessEqual(mc.get('bli'), None)
+
+        # try weird server formats
+        # number is not a server
+        self.failUnlessRaises(TypeError, lambda: mc.set_servers([12]))
+        # forget port
+        self.failUnlessRaises(TypeError, lambda: mc.set_servers(['12']))
         
         # set servers again
-        mc.set_servers(servers)
-        test_setget(mc, 'bla', 'bli')
-        test_setget(mc, 'blo', 'blu')
+        mc.set_servers(self.servers)
+        test_setget(mc, 'bla', 'bli', self.failUnlessEqual)
+        test_setget(mc, 'blo', 'blu', self.failUnlessEqual)
 
         # flush_all
         # fixme: how to test this?
         mc.flush_all()
 
-    # use memcache as the reference
-    import memcache
-    test(memcache, ok=1)
+        mc.disconnect_all()
 
-    # now test c- module
-    import cmemcache
-    test(cmemcache, ok=0)
+    def test_memcache( self ):
+        # fixme: it seems like one can only start one Client from python (or maybe the
+        # process?). I was trying to run the test on memcache and then on cmemcache but
+        # then the first mc.get() fails. I thought at first it was my cmemcache
+        # implementation, but running the test twice on memcache fails as well!
+
+        # use memcache as the reference
+        # import memcache
+        # self._test(memcache, ok=1)
+        # self._test(memcache, ok=1)
+        
+        # now test c- module
+        import cmemcache
+        self._test(cmemcache, ok=0)
 
 if __name__ == '__main__':
-    main()
+    unittest.main()
