@@ -14,8 +14,7 @@ typedef struct
     int debug;
 } CmemcacheObject;
 
-#define NDEBUG
-#ifdef NDEBUG
+#ifndef NDEBUG
 #define debug(args) printf args
 #define debug_def(args) args
 #else
@@ -28,43 +27,65 @@ typedef struct
 static int
 do_set_servers(CmemcacheObject* self, PyObject* servers)
 {
-    if (!PySequence_Check(servers)) {
+    debug(("do_set_servers\n"));
+    
+    if (!PySequence_Check(servers))
+    {
         PyErr_BadArgument();
         return -1;
     }
 
     int error = 0;
+    
+    /* there seems to be no way to remove servers, so get rid of memcache all together */
+    if (self->mc)
+    {
+        mc_free(self->mc);
+        self->mc = NULL;
+    }
     assert(self->mc == NULL);
+
+    /* create new instance */
     self->mc = mc_new();
     if (self->mc == NULL)
     {
-        // fixme: raise a different exception.
-        PyErr_BadArgument();
+        PyErr_NoMemory();
         return -1;
     }
-    /* disconnect from current servers */
-    mc_server_disconnect_all(self->mc);
-    /* add new ones */
+    
+    /* add servers, allow any sequence of strings */
     const int size = PySequence_Size(servers);
     int i;
-    for (i = 0; i < size; ++i)
+    for (i = 0; i < size && error == 0; ++i)
     {
-        PyObject* server = NULL;
-        server = PySequence_GetItem(servers, i);
-        if (!PyString_Check(server)) {
-            PyErr_BadArgument();
-            return -1;
-        }
-        const char* cserver = PyString_AsString(server);
-        if (cserver)
+        PyObject* item = PySequence_GetItem(servers, i);
+        if (item)
         {
-            debug(("cserver %s\n", cserver));
-            mc_server_add4(self->mc, cserver);
-        }
-        else
-        {
-            PyErr_BadArgument();
-            error = 1;
+            if (PyString_Check(item))
+            {
+                const char* cserver = PyString_AsString(item);
+                assert(cserver);
+                debug(("cserver %s\n", cserver));
+            
+                /* mc_server_add4 is not happy without ':' (it segfaults!) so check */
+                if (strstr(cserver, ":") == NULL)
+                {
+                    PyErr_Format(PyExc_TypeError,
+                                 "expected \"server:port\" but \"%s\" found", cserver);
+                    error = 1;
+                }
+                else
+                {
+                    debug_def(int retval =) mc_server_add4(self->mc, cserver);
+                    debug(("retval %d\n", retval));
+                }
+            }
+            else
+            {
+                PyErr_BadArgument();
+                error = 1;
+            }
+            Py_DECREF(item);
         }
     }
     if (error)
@@ -117,6 +138,7 @@ cmemcache_dealloc(CmemcacheObject* self)
     if (self->mc)
     {
         mc_free(self->mc);
+        self->mc = NULL;
     }
 }
 
@@ -146,6 +168,7 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
     
     if (! PyArg_ParseTuple(args, "s#s#|i", &key, &keylen, &value, &valuelen, &time))
         return NULL;
+    
     debug(("cmemcache_store %d %s '%s'\n", storeType, key, value));
     int retval = 0;
     switch(storeType)
@@ -203,7 +226,10 @@ cmemcache_get(PyObject* pyself, PyObject* args)
     int keylen = 0;
 
     if (! PyArg_ParseTuple(args, "s#", &key, &keylen))
+    {
+        debug(("bad arguments\n"));
         return NULL;
+    }
     debug(("cmemcache_get %s len %d\n", key, keylen));
     
     struct memcache_req *req;
@@ -212,9 +238,18 @@ cmemcache_get(PyObject* pyself, PyObject* args)
     res = mc_req_add(req, key, keylen);
     mc_res_free_on_delete(res, 1);
     mc_get(self->mc, req);
-    debug(("retval = %d '%s'\n", res->size, (char*)res->val));
+    debug(("attempt %d found %d res %d '%s'\n",
+           mc_res_attempted(res), mc_res_found(res), res->size, (char*)res->val));
     PyObject* retval;
-    retval = PyString_FromStringAndSize(res->val, res->size);
+    if (mc_res_found(res))
+    {
+        retval = PyString_FromStringAndSize(res->val, res->size);
+    }
+    else
+    {
+        Py_INCREF(Py_None);
+        retval = Py_None;
+    }
     mc_req_free(req);
     return retval;
 }
@@ -244,7 +279,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
     
-    debug(("cmemcache_get\n"));
+    debug(("cmemcache_get_multi\n"));
 
     assert(self->mc);
     
@@ -261,7 +296,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
     int i;
     int error = 0;
     PyObject* dict = PyDict_New();
-    for (i = 0; i < 1/*fixme size*/; ++i)
+    for (i = 0; i < size; ++i)
     {
         PyObject* key = NULL;
         key = PySequence_GetItem(keys, i);
@@ -279,7 +314,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
             res = mc_req_add(req, ckey, PyString_Size(key));
             debug(("res %p val %p size %d\n", res, res->val, res->size));
             mc_res_free_on_delete(res, 1);
-            // mc_res_register_fetch_cb(req, res, get_multi_cb, dict);
+            mc_res_register_fetch_cb(req, res, get_multi_cb, dict);
         }
         else
         {
@@ -297,10 +332,6 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
         debug(("before mc_get\n"));
         mc_get(self->mc, req);
         debug(("after mc_get\n"));
-        TAILQ_FOREACH(res, &req->query, entries) {
-            debug(("res %p k %s v %s attempted %d found %d\n", res,
-                   res->key, (char*)res->val, mc_res_attempted(res), mc_res_found(res)));
-        }
     }
     mc_req_free(req);
 
@@ -393,9 +424,24 @@ cmemcache_flush_all(PyObject* pyself, PyObject* args)
     debug(("cmemcache_flush_all\n"));
 
     assert(self->mc);
-    debug(("cmemcache_flush_all\n"));
     debug_def(int retval =) mc_flush_all(self->mc);
     debug(("retval = %d\n", retval));
+    
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
+cmemcache_disconnect_all(PyObject* pyself, PyObject* args)
+{
+    CmemcacheObject* self = (CmemcacheObject*)pyself;
+    
+    debug(("cmemcache_disconnect_all\n"));
+
+    assert(self->mc);
+    mc_server_disconnect_all(self->mc);
     
     Py_INCREF(Py_None);
     return Py_None;
@@ -412,47 +458,51 @@ static PyMethodDef cmemcache_methods[] = {
     },
     {
         "add", cmemcache_add, METH_VARARGS,
-        "Client.add(key, value, time=0) -- Add new key with value.\n\nLike L{set}, but only stores in memcache if the key doesn't already exist."
+        "add(key, value, time=0) -- Add new key with value.\n\nLike L{set}, but only stores in memcache if the key doesn't already exist."
     },
     {
         "replace", cmemcache_replace, METH_VARARGS,
-        "Client.replace(key, value, time=0) -- replace existing key with value.\n\nLike L{set}, but only stores in memcache if the key already exists.\nThe opposite of L{add}."
+        "replace(key, value, time=0) -- replace existing key with value.\n\nLike L{set}, but only stores in memcache if the key already exists.\nThe opposite of L{add}."
     },
     {
         "get", cmemcache_get, METH_VARARGS,
-        "Client.get(key) -- Retrieves a key from the memcache.\n\n@return: The value or None."
+        "get(key) -- Retrieves a key from the memcache.\n\n@return: The value or None."
     },
     {
         "get_multi", cmemcache_get_multi, METH_VARARGS,
-        "Client.get_multi(keys) --"
-        "Retrieves multiple keys from the memcache doing just one query."
-        ">>> success = mc.set(\"foo\", \"bar\")"
-        ">>> success = mc.set(\"baz\", 42)"
-        ">>> mc.get_multi([\"foo\", \"baz\", \"foobar\"]) == {\"foo\": \"bar\", \"baz\": 42}"
-        ""
-        "This method is recommended over regular L{get} as it lowers the number of"
-        "total packets flying around your network, reducing total latency, since"
-        "your app doesn't have to wait for each round-trip of L{get} before sending"
-        "the next one."
-        ""
-        "@param keys: An array of keys."
-        "@return:  A dictionary of key/value pairs that were available."
+        "get_multi(keys) --\n"
+        "Retrieves multiple keys from the memcache doing just one query.\n"
+        ">>> success = mc.set(\"foo\", \"bar\")\n"
+        ">>> success = mc.set(\"baz\", 42)\n"
+        ">>> mc.get_multi([\"foo\", \"baz\", \"foobar\"]) == {\"foo\": \"bar\", \"baz\": 42}\n"
+        "\n"
+        "This method is recommended over regular L{get} as it lowers the number of\n"
+        "total packets flying around your network, reducing total latency, since\n"
+        "your app doesn't have to wait for each round-trip of L{get} before sending\n"
+        "the next one.\n"
+        "\n"
+        "@param keys: An array of keys.\n"
+        "@return:  A dictionary of key/value pairs that were available.\n"
     },
     {
         "delete", cmemcache_delete, METH_VARARGS,
-        "Client.delete(key, time=0) -- Deletes a key from the memcache.\n\n@return: Nonzero on success.\n@rtype: int"
+        "delete(key, time=0) -- Deletes a key from the memcache.\n\n@return: Nonzero on success.\n@rtype: int"
     },
     {
         "decr", cmemcache_decr, METH_VARARGS,
-        "Client.decr(key, val) -- decrement key's value with val, returns new value"
+        "decr(key, val) -- decrement key's value with val, returns new value"
     },
     {
         "incr", cmemcache_incr, METH_VARARGS,
-        "Client.incr(key, val) -- increment key's value with val, returns new value"
+        "incr(key, val) -- increment key's value with val, returns new value"
     },
     {
         "flush_all", cmemcache_flush_all, METH_NOARGS,
-        "Client.flush_all() -- flush all keys on all servers"
+        "flush_all() -- flush all keys on all servers"
+    },
+    {
+        "disconnect_all", cmemcache_disconnect_all, METH_NOARGS,
+        "disconnect_all() -- disconnect all servers"
     },
     {NULL}  /* Sentinel */
 };
@@ -479,7 +529,7 @@ static PyTypeObject cmemcache_CmemcacheType = {
     0,                         /*tp_setattro*/
     0,                         /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /*tp_flags*/
-    "cmemcache object",        /* tp_doc */
+    "Client object",           /* tp_doc */
     0,		               /* tp_traverse */
     0,		               /* tp_clear */
     0,		               /* tp_richcompare */
@@ -510,6 +560,13 @@ PyMODINIT_FUNC
 initcmemcache(void) 
 {
     PyObject* m;
+
+#ifndef NDEBUG
+    /* turn off info and notice */
+    mc_err_filter_del(MCM_ERR_LVL_INFO);
+    mc_err_filter_del(MCM_ERR_LVL_NOTICE);
+    mc_err_filter_del(MCM_ERR_LVL_WARN);
+#endif
     
     cmemcache_CmemcacheType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&cmemcache_CmemcacheType) < 0)
