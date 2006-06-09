@@ -1,3 +1,5 @@
+#
 # $Id$
+#
 
-Python C module interface to memcached.
+Python C module interface to memcached, build on top of libmemcache.
