@@ -565,9 +565,11 @@ initcmemcache(void)
     
 #ifdef NDEBUG
     /* turn off some message/errors */
-    mc_err_filter_del(MCM_ERR_LVL_INFO);
-    mc_err_filter_del(MCM_ERR_LVL_NOTICE);
-    mc_err_filter_del(MCM_ERR_LVL_WARN);
+    debug(("error filter %x\n", mc_err_filter_get()));
+    mc_err_filter_add(MCM_ERR_LVL_INFO);
+    mc_err_filter_add(MCM_ERR_LVL_NOTICE);
+    mc_err_filter_add(MCM_ERR_LVL_WARN);
+    debug(("error filter %x\n", mc_err_filter_get()));
 #endif
     
     cmemcache_CmemcacheType.tp_new = PyType_GenericNew;

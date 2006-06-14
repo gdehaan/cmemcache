@@ -10,7 +10,7 @@ Test for cmemcache module.
 __version__ = "$Revision$"
 __author__ = "$Author$"
 
-import unittest
+import os, signal, socket, subprocess, unittest
 
 #-----------------------------------------------------------------------------------------
 #
@@ -28,7 +28,6 @@ def test_setget(mc, key, val, checkf):
     """
     test set and get in one go
     """
-    print "Testing set/get {'%s': %s} ..." % (to_s(key), to_s(val)),
     mc.set(key, val)
     newval = mc.get(key)
     checkf(val, newval)
@@ -83,10 +82,7 @@ class TestCmemcache( unittest.TestCase ):
         mc.set('blo', 'bli')
         self.failUnlessEqual(mc.get('blo'), 'bli')
         d = mc.get_multi(['blo', 'number', 'doesnotexist'])
-        print 'd', d
-        self.failUnlessEqual(d['blo'], 'bli')
-        self.failUnlessEqual(d['number'], '6')
-        self.assert_(not d.has_key('doesnotexist'))
+        self.failUnlessEqual(d, {'blo':'bli', 'number':'6'})
 
         # make sure zero delimitation characters are ignored in values.
         test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
@@ -119,6 +115,19 @@ class TestCmemcache( unittest.TestCase ):
         mc.disconnect_all()
 
     def test_memcache( self ):
+        # quick check if memcached is running
+        ip, port = self.servers[0].split(':')
+        print 'ip', ip, 'port', port
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        memcached = None
+        try:
+            s.connect((ip, int(port)))
+        except socket.error, e:
+            # not running, start one
+            memcached = subprocess.Popen("memcached -m 10", shell=True)
+            print 'memcached not running, starting one (pid %d)' % (memcached.pid,)
+        s.close()
+
         # fixme: it seems like one can only start one Client from python (or maybe the
         # process?). I was trying to run the test on memcache and then on cmemcache but
         # then the first mc.get() fails. I thought at first it was my cmemcache
@@ -129,9 +138,13 @@ class TestCmemcache( unittest.TestCase ):
         # self._test(memcache, ok=1)
         # self._test(memcache, ok=1)
         
-        # now test c- module
+        # test c- module
         import cmemcache
         self._test(cmemcache, ok=0)
+
+        # if we created memcached for our test, then shut it down
+        if memcached:
+            os.kill(memcached.pid, signal.SIGINT)
 
 if __name__ == '__main__':
     unittest.main()
