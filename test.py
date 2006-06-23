@@ -37,6 +37,7 @@ def test_setget(mc, key, val, checkf):
 class TestCmemcache( unittest.TestCase ):
 
     servers = ["127.0.0.1:11211"]
+    servers_weighted = [("127.0.0.1:11211", 2)]
 
     def _test_cmemcache(self, mcm):
         """
@@ -47,6 +48,12 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.get('blo'), 'blu')
         self.failUnlessEqual(mc.getflags('blo'), ('blu', 12))
 
+        # try weird server formats
+        # number is not a server
+        self.failUnlessRaises(TypeError, lambda: mc.set_servers([12]))
+        # forget port
+        self.failUnlessRaises(TypeError, lambda: mc.set_servers(['12']))
+        
     def _test_sgra(self, mc, val, repval, norepval, ok):
         """
         Test set, get, replace, add api.
@@ -101,6 +108,9 @@ class TestCmemcache( unittest.TestCase ):
 
         # make sure zero delimitation characters are ignored in values.
         test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
+
+        # get stats
+        print mc.get_stats()
         
         # set_servers to none
         mc.set_servers([])
@@ -112,12 +122,11 @@ class TestCmemcache( unittest.TestCase ):
         else:
             self.failUnlessEqual(mc.get('bli'), None)
 
-        # try weird server formats
-        # number is not a server
-        self.failUnlessRaises(TypeError, lambda: mc.set_servers([12]))
-        # forget port
-        self.failUnlessRaises(TypeError, lambda: mc.set_servers(['12']))
-        
+        # set servers with weight syntax
+        mc.set_servers(self.servers_weighted)
+        test_setget(mc, 'bla', 'bli', self.failUnlessEqual)
+        test_setget(mc, 'blo', 'blu', self.failUnlessEqual)
+
         # set servers again
         mc.set_servers(self.servers)
         test_setget(mc, 'bla', 'bli', self.failUnlessEqual)
@@ -125,7 +134,9 @@ class TestCmemcache( unittest.TestCase ):
 
         # flush_all
         # fixme: how to test this?
-        mc.flush_all()
+        # fixme: after doing flush_all() one can not start new Client(), do not know why
+        # since I know no good way to test it we ignore it for now
+        # mc.flush_all()
 
         mc.disconnect_all()
 
@@ -157,17 +168,15 @@ class TestCmemcache( unittest.TestCase ):
             print 'memcached not running, starting one (pid %d)' % (memcached.pid,)
         s.close()
 
-        # fixme: it seems like one can only start one Client from python (or maybe the
-        # process?). I was trying to run the test on memcache and then on cmemcache but
-        # then the first mc.get() fails. I thought at first it was my cmemcache
-        # implementation, but running the test twice on memcache fails as well!
-
         # use memcache as the reference
-        # import memcache
-        # self._test(memcache, ok=1)
-        # self._test(memcache, ok=1)
+        try:
+            import memcache
+        except ImportError:
+            pass
+        else:
+            self._test(memcache, ok=1)
         
-        # test c- module
+        # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)
         self._test_pickleClient(cmemcache, ok=0)

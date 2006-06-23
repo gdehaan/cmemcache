@@ -4,7 +4,9 @@
 #
 
 """
-Define pickle client on top of _cmemcache.so, should be equivalent to memcache.py.
+The extension only supports string values. This module defines another client on top
+of the extension to support any picklable object. Logic is a straight copy from
+memcache.py.
 """
 
 __version__ = "$Revision$"
@@ -22,7 +24,8 @@ from _cmemcache import Client
 #
 class PickleClient(Client):
     """
-    Redefine get and set get/set any type of object.
+    Use memcached flags parameter to set/add/replace to handle any python class as
+    the cache value. Also does int, long conversion to/from string.
     """
 
     _FLAG_PICKLE  = 1<<0
