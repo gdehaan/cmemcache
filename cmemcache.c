@@ -105,7 +105,7 @@ cmemcache_init(CmemcacheObject* self, PyObject* args, PyObject* kwds)
     PyObject* servers=NULL;
     char debug = 0;
 
-    if (! PyArg_ParseTuple(args, "O|b", &servers, debug))
+    if (! PyArg_ParseTuple(args, "O|b", &servers, &debug))
         return -1; 
 
     self->debug = debug;
@@ -156,8 +156,6 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
     
-    debug(("cmemcache_store\n"));
-
     assert(self->mc);
     
     char* key = NULL;
@@ -165,22 +163,25 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
     const char* value = NULL;
     int valuelen = 0;
     int time = 0;
+    int flags = 0;
     
-    if (! PyArg_ParseTuple(args, "s#s#|i", &key, &keylen, &value, &valuelen, &time))
+    if (! PyArg_ParseTuple(args, "s#s#|ii",
+                           &key, &keylen, &value, &valuelen, &time, &flags))
         return NULL;
     
-    debug(("cmemcache_store %d %s '%s'\n", storeType, key, value));
+    debug(("cmemcache_store %d %s '%s' time %d flags %d\n",
+           storeType, key, value, time, flags));
     int retval = 0;
     switch(storeType)
     {
         case SET:
-            retval = mc_set(self->mc, key, keylen, value, valuelen, time, 0);
+            retval = mc_set(self->mc, key, keylen, value, valuelen, time, flags);
             break;
         case ADD:
-            retval = mc_add(self->mc, key, keylen, value, valuelen, time, 0);
+            retval = mc_add(self->mc, key, keylen, value, valuelen, time, flags);
             break;
         case REPLACE:
-            retval = mc_replace(self->mc, key, keylen, value, valuelen, time, 0);
+            retval = mc_replace(self->mc, key, keylen, value, valuelen, time, flags);
             break;
     }
     debug(("retval = %d\n", retval));
@@ -214,12 +215,10 @@ cmemcache_replace(PyObject* pyself, PyObject* args)
 //----------------------------------------------------------------------------------------
 //
 static PyObject*
-cmemcache_get(PyObject* pyself, PyObject* args)
+cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
     
-    debug(("cmemcache_get\n"));
-
     assert(self->mc);
     
     char* key = NULL;
@@ -230,7 +229,7 @@ cmemcache_get(PyObject* pyself, PyObject* args)
         debug(("bad arguments\n"));
         return NULL;
     }
-    debug(("cmemcache_get %s len %d\n", key, keylen));
+    debug(("cmemcache_get_imp %s len %d\n", key, keylen));
     
     struct memcache_req *req;
     struct memcache_res *res;
@@ -243,7 +242,14 @@ cmemcache_get(PyObject* pyself, PyObject* args)
     PyObject* retval;
     if (mc_res_found(res))
     {
-        retval = PyString_FromStringAndSize(res->val, res->size);
+        if (retFlags)
+        {
+            retval = Py_BuildValue("s#i", res->val, res->size, (int)res->flags);
+        }
+        else
+        {
+            retval = PyString_FromStringAndSize(res->val, res->size);
+        }
     }
     else
     {
@@ -252,6 +258,22 @@ cmemcache_get(PyObject* pyself, PyObject* args)
     }
     mc_req_free(req);
     return retval;
+}
+
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
+cmemcache_get(PyObject* pyself, PyObject* args)
+{
+    return cmemcache_get_imp(pyself, args, 0);
+}
+
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
+cmemcache_getflags(PyObject* pyself, PyObject* args)
+{
+    return cmemcache_get_imp(pyself, args, 1);
 }
 
 //----------------------------------------------------------------------------------------
@@ -454,19 +476,23 @@ static PyMethodDef cmemcache_methods[] = {
     },
     {
         "set", cmemcache_set, METH_VARARGS,
-        "Client.set(key, value, time=0) -- Unconditionally sets a key to a given value in the memcache.\n\n@return: Nonzero on success.\n@rtype: int\n"
+        "Client.set(key, value, time=0, flags=0) -- Unconditionally sets a key to a given value in the memcache.\n\n@return: Nonzero on success.\n@rtype: int\n"
     },
     {
         "add", cmemcache_add, METH_VARARGS,
-        "add(key, value, time=0) -- Add new key with value.\n\nLike L{set}, but only stores in memcache if the key doesn't already exist."
+        "add(key, value, time=0, flags=0) -- Add new key with value.\n\nLike L{set}, but only stores in memcache if the key doesn't already exist."
     },
     {
         "replace", cmemcache_replace, METH_VARARGS,
-        "replace(key, value, time=0) -- replace existing key with value.\n\nLike L{set}, but only stores in memcache if the key already exists.\nThe opposite of L{add}."
+        "replace(key, value, time=0, flags=0) -- replace existing key with value.\n\nLike L{set}, but only stores in memcache if the key already exists.\nThe opposite of L{add}."
     },
     {
         "get", cmemcache_get, METH_VARARGS,
         "get(key) -- Retrieves a key from the memcache.\n\n@return: The value or None."
+    },
+    {
+        "getflags", cmemcache_getflags, METH_VARARGS,
+        "getflags(key) -- Retrieves a key from the memcache.\n\n@return: The (value,flags) or None."
     },
     {
         "get_multi", cmemcache_get_multi, METH_VARARGS,
@@ -557,11 +583,11 @@ static PyMethodDef cmemcache_module_methods[] = {
 #define PyMODINIT_FUNC void
 #endif
 PyMODINIT_FUNC
-initcmemcache(void) 
+init_cmemcache(void) 
 {
     PyObject* m;
 
-    debug(("initcmemcache\n"));
+    debug(("init_cmemcache\n"));
     
 #ifdef NDEBUG
     /* turn off some message/errors */
@@ -576,7 +602,7 @@ initcmemcache(void)
     if (PyType_Ready(&cmemcache_CmemcacheType) < 0)
         return;
 
-    m = Py_InitModule3("cmemcache", cmemcache_module_methods,
+    m = Py_InitModule3("_cmemcache", cmemcache_module_methods,
                        "Fast client to memcached.");
 
     Py_INCREF(&cmemcache_CmemcacheType);

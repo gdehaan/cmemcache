@@ -13,7 +13,7 @@ try:
 except ValueError:
     pass
 
-cmemcache = Extension("cmemcache",
+cmemcache = Extension("_cmemcache",
                       sources,
                       include_dirs = ['/usr/local/include'],
                       extra_compile_args = ['-Wall'],

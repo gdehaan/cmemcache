@@ -38,6 +38,33 @@ class TestCmemcache( unittest.TestCase ):
 
     servers = ["127.0.0.1:11211"]
 
+    def _test_cmemcache(self, mcm):
+        """
+        Test cmemcache specifics.
+        """
+        mc = mcm.Client(self.servers)
+        mc.set('blo', 'blu', 0, 12)
+        self.failUnlessEqual(mc.get('blo'), 'blu')
+        self.failUnlessEqual(mc.getflags('blo'), ('blu', 12))
+
+    def _test_sgra(self, mc, val, repval, norepval, ok):
+        """
+        Test set, get, replace, add api.
+        """
+        self.assert_(mc.set('blo', val) == ok)
+        self.failUnlessEqual(mc.get('blo'), val)
+        mc.replace('blo', repval)
+        self.failUnlessEqual(mc.get('blo'), repval)
+        mc.add('blo', norepval)
+        self.failUnlessEqual(mc.get('blo'), repval)
+
+        mc.delete('blo')
+        self.failUnlessEqual(mc.get('blo'), None)
+        mc.replace('blo', norepval)
+        self.failUnlessEqual(mc.get('blo'), None)
+        mc.add('blo', repval)
+        self.failUnlessEqual(mc.get('blo'), repval)
+
     def _test(self, mcm, ok):
         """
         The test.
@@ -56,20 +83,8 @@ class TestCmemcache( unittest.TestCase ):
         # setup
         mc = mcm.Client(self.servers, debug=1)
 
-        self.assert_(mc.set('blo', 'blu') == ok)
-        self.failUnlessEqual(mc.get('blo'), 'blu')
-        mc.replace('blo', 'replace')
-        self.failUnlessEqual(mc.get('blo'), 'replace')
-        mc.add('blo', 'will be NOT set')
-        self.failUnlessEqual(mc.get('blo'), 'replace')
+        self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
-        mc.delete('blo')
-        self.failUnlessEqual(mc.get('blo'), None)
-        mc.replace('blo', 'will NOT be set')
-        self.failUnlessEqual(mc.get('blo'), None)
-        mc.add('blo', 'will be set')
-        self.failUnlessEqual(mc.get('blo'), 'will be set')
-        
         mc.delete('blo')
         self.failUnlessEqual(mc.get('blo'), None)
         
@@ -114,7 +129,21 @@ class TestCmemcache( unittest.TestCase ):
 
         mc.disconnect_all()
 
-    def test_memcache( self ):
+    def _test_pickleClient(self, mcm, ok):
+        """
+        Test PickleClient, only need to test the set, get, add, replace, rest is
+        implemented by Client base.
+        """
+        mc = mcm.PickleClient(self.servers)
+
+        self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
+
+        val = {'bla':'bli', 'blo':12}
+        repval = {'bla':'blo', 'blo':12}
+        norepval = {'blo':12}
+        self._test_sgra(mc, val, repval, norepval, ok)
+
+    def test_memcache(self):
         # quick check if memcached is running
         ip, port = self.servers[0].split(':')
         print 'ip', ip, 'port', port
@@ -140,6 +169,8 @@ class TestCmemcache( unittest.TestCase ):
         
         # test c- module
         import cmemcache
+        self._test_cmemcache(cmemcache)
+        self._test_pickleClient(cmemcache, ok=0)
         self._test(cmemcache, ok=0)
 
         # if we created memcached for our test, then shut it down
