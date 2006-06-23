@@ -1,0 +1,14 @@
+=====================
+   TODO: cmemcache
+=====================
+
+.. contents::
+..
+
+TODO
+----
+
+- use mc_req_add_ref to avoid copy of key
+
+
+

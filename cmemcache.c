@@ -61,11 +61,22 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
         PyObject* item = PySequence_GetItem(servers, i);
         if (item)
         {
+            PyObject* name = NULL;
+            int weight = 1;
+            
             if (PyString_Check(item))
             {
-                const char* cserver = PyString_AsString(item);
+                name = item;
+            }
+            else if (PyTuple_Check(item))
+            {
+                error = ! PyArg_ParseTuple(item, "Oi", &name, &weight);
+            }
+            if (name)    
+            {
+                const char* cserver = PyString_AsString(name);
                 assert(cserver);
-                debug(("cserver %s\n", cserver));
+                debug(("cserver %s weight %d\n", cserver, weight));
             
                 /* mc_server_add4 is not happy without ':' (it segfaults!) so check */
                 if (strstr(cserver, ":") == NULL)
@@ -76,8 +87,12 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
                 }
                 else
                 {
-                    debug_def(int retval =) mc_server_add4(self->mc, cserver);
-                    debug(("retval %d\n", retval));
+                    int i;
+                    for (i = 0; i < weight; ++i)
+                    {
+                        debug_def(int retval =) mc_server_add4(self->mc, cserver);
+                        debug(("retval %d\n", retval));
+                    }
                 }
             }
             else
@@ -318,31 +333,34 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
     int i;
     int error = 0;
     PyObject* dict = PyDict_New();
-    for (i = 0; i < size; ++i)
+    for (i = 0; i < size && error == 0; ++i)
     {
         PyObject* key = NULL;
         key = PySequence_GetItem(keys, i);
-        if (!PyString_Check(key))
+        if (PyString_Check(key))
+        {
+            char* ckey = PyString_AsString(key);
+            if (ckey)
+            {
+                debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
+                res = mc_req_add(req, ckey, PyString_Size(key));
+                debug(("res %p val %p size %d\n", res, res->val, res->size));
+                mc_res_free_on_delete(res, 1);
+                mc_res_register_fetch_cb(req, res, get_multi_cb, dict);
+            }
+            else
+            {
+                PyErr_BadArgument();
+                error = 1;
+            }
+        }
+        else
         {
             debug(("not a string\n"));
             PyErr_BadArgument();
             error = 1;
-            break;
         }
-        char* ckey = PyString_AsString(key);
-        if (ckey)
-        {
-            debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
-            res = mc_req_add(req, ckey, PyString_Size(key));
-            debug(("res %p val %p size %d\n", res, res->val, res->size));
-            mc_res_free_on_delete(res, 1);
-            mc_res_register_fetch_cb(req, res, get_multi_cb, dict);
-        }
-        else
-        {
-            PyErr_BadArgument();
-            error = 1;
-        }
+        Py_DECREF(key);
     }
     if (error)
     {
@@ -439,6 +457,82 @@ cmemcache_incr(PyObject* pyself, PyObject* args)
 //----------------------------------------------------------------------------------------
 //
 static PyObject*
+cmemcache_get_stats(PyObject* pyself, PyObject* args)
+{
+    CmemcacheObject* self = (CmemcacheObject*)pyself;
+    
+    debug(("cmemcache_get_stats\n"));
+
+    assert(self->mc);
+    PyObject* retval = PyList_New(0);
+
+    /* loop copied from mcm_server_disconnect_all, but is there some supported way of
+       going through all the servers? */
+    struct memcache_server *ms;
+    for (ms = self->mc->server_list.tqh_first; ms != NULL; ms = ms->entries.tqe_next)
+    {
+        struct memcache_server_stats* stats;
+        stats = mc_server_stats(self->mc, ms);
+        if (stats != NULL)
+        {
+            char buffer[128+1];
+            snprintf(buffer, 128, "%s:%s", ms->hostname, ms->port);
+            PyObject* name = PyString_FromString(buffer);
+            PyObject* dict = PyDict_New();
+
+#define SET_SNPRINTF(d, key, fmt, val)           \
+            snprintf(buffer, 128, fmt, val);   \
+            PyDict_SetItem(d, PyString_FromString(key), PyString_FromString(buffer))
+            
+#define SET_TIME(d, key, val) SET_SNPRINTF(d, key, "%ld", val)
+#define SET_ITEMU32(d, key, val) SET_SNPRINTF(d, key, "%u", val)
+#define SET_ITEMU64(d, key, val) SET_SNPRINTF(d, key, "%llu", val)
+#define SET_TIMEVAL(d, key, val)                                \
+            SET_SNPRINTF(d, key, "%lf", val.tv_sec + val.tv_usec * 1.0e-9)
+                
+            SET_ITEMU32(dict, "pid", stats->pid);
+            SET_TIME(dict, "uptime", stats->uptime);
+            SET_TIME(dict, "time", stats->time);
+            PyDict_SetItem(dict, PyString_FromString("version"),
+                           PyString_FromString(stats->version));
+            SET_TIMEVAL(dict, "rusage_user", stats->rusage_user);
+            SET_TIMEVAL(dict, "rusage_system", stats->rusage_system);
+            SET_ITEMU32(dict, "curr_items", stats->curr_items);
+            SET_ITEMU64(dict, "total_items", stats->total_items);
+            SET_ITEMU64(dict, "bytes", stats->bytes);
+            SET_ITEMU32(dict, "curr_connections", stats->curr_connections);
+            SET_ITEMU64(dict, "total_connections", stats->total_connections);
+            SET_ITEMU32(dict, "connection_structures", stats->connection_structures);
+            SET_ITEMU64(dict, "cmd_get", stats->cmd_get);
+#ifdef SEAN_HACKS
+            SET_ITEMU64(dict, "cmd_refresh", stats->cmd_refresh);
+#endif
+            SET_ITEMU64(dict, "cmd_set", stats->cmd_set);
+            SET_ITEMU64(dict, "get_hits", stats->get_hits);
+            SET_ITEMU64(dict, "get_misses", stats->get_misses);
+#ifdef SEAN_HACKS
+            SET_ITEMU64(dict, "refresh_hits", stats->refresh_hits);
+            SET_ITEMU64(dict, "refresh_misses", stats->refresh_misses);
+#endif
+            SET_ITEMU64(dict, "bytes_read", stats->bytes_read);
+            SET_ITEMU64(dict, "bytes_written", stats->bytes_written);
+            SET_ITEMU64(dict, "limit_maxbytes", stats->limit_maxbytes);
+
+            PyObject* tuple = PyTuple_New(2);
+            PyTuple_SetItem(tuple, 0, name);
+            PyTuple_SetItem(tuple, 1, dict);
+            PyList_Append(retval, tuple);
+            
+            mc_server_stats_free(stats);
+        }
+    }
+    
+    return retval;
+}
+
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
 cmemcache_flush_all(PyObject* pyself, PyObject* args)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
@@ -521,6 +615,14 @@ static PyMethodDef cmemcache_methods[] = {
     {
         "incr", cmemcache_incr, METH_VARARGS,
         "incr(key, val) -- increment key's value with val, returns new value"
+    },
+    {
+        "get_stats", cmemcache_get_stats, METH_NOARGS,
+        "get_stats() -- Get statistics from all servers.\n"
+        "@return: A list of tuples ( server_identifier, stats_dictionary ).\n"
+        "The dictionary contains a number of name/value pairs specifying\n"
+        "the name of the status field and the string value associated with\n"
+        "it.  The values are not converted from strings."
     },
     {
         "flush_all", cmemcache_flush_all, METH_NOARGS,
