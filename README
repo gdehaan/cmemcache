@@ -1,5 +1,37 @@
-#
-# $Id$
-#
+.. -*- mode: text -*-
+.. $Id$
 
-Python extension to memcached, build on top of libmemcache.
+===============================
+ Python extension to memcached
+===============================
+
+.. contents::
+..
+    1  Description
+    2  Dependencies
+    3  To do
+    4  Known Bugs
+
+Description
+===========
+
+Python extension to memcached, build on top of libmemcache. API very similar to
+memcache.py, except for some return codes which follow libmemcache conventions.
+
+Dependencies
+============
+
+- Python
+- libmemcache (using version 1.4.0.rc2, not sure which is required
+
+To do
+=====
+
+- use mc_req_add_ref to avoid copy of key
+
+Known Bugs
+==========
+
+- set_servers with the wrong port number causes a segfault (in libmemcache). See commented
+  out testing code in test.py.
+
