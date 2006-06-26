@@ -40,6 +40,7 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
     /* there seems to be no way to remove servers, so get rid of memcache all together */
     if (self->mc)
     {
+        debug(("free mc %p\n", self->mc));
         mc_free(self->mc);
         self->mc = NULL;
     }
@@ -47,6 +48,7 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
 
     /* create new instance */
     self->mc = mc_new();
+    debug(("new mc %p\n", self->mc));
     if (self->mc == NULL)
     {
         PyErr_NoMemory();
@@ -88,6 +90,10 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
                 else
                 {
                     int i;
+                    if (weight>15)
+                    {
+                        weight = 15;
+                    }
                     for (i = 0; i < weight; ++i)
                     {
                         debug_def(int retval =) mc_server_add4(self->mc, cserver);
@@ -712,7 +718,7 @@ init_cmemcache(void)
 }
 
 /*
-  Local Variables: ***
-  compile-command: "cd .; python setup.py build_ext -i && python test.py" ***
-  End: ***
+  Local Variables:
+  compile-command: "cd .; python setup.py build_ext -i && python test.py"
+  End:
 */  
