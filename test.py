@@ -37,6 +37,7 @@ def test_setget(mc, key, val, checkf):
 class TestCmemcache( unittest.TestCase ):
 
     servers = ["127.0.0.1:11211"]
+    servers_unknown = ["127.0.0.1:52345"]
     servers_weighted = [("127.0.0.1:11211", 2)]
 
     def _test_cmemcache(self, mcm):
@@ -121,6 +122,10 @@ class TestCmemcache( unittest.TestCase ):
             pass
         else:
             self.failUnlessEqual(mc.get('bli'), None)
+
+        # set unknown server
+        # mc.set_servers(self.servers_unknown)
+        # test_setget(mc, 'bla', 'bli', self.failIfEqual)
 
         # set servers with weight syntax
         mc.set_servers(self.servers_weighted)

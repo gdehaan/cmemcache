@@ -33,5 +33,5 @@ setup(name="cmemcache",
       maintainer_email="gijsbert_de_haan@hotmail.com",
       url="http://gijsbert.org/",
       license="GNU General Public License (GPL)",
-      # packages=["cmemcache_p"],
+      py_modules = ['cmemcache'],
       ext_modules=[cmemcache])
