@@ -13,20 +13,22 @@ try:
 except ValueError:
     pass
 
-cmemcache = Extension("_cmemcache",
-                      sources,
-                      include_dirs = ['/usr/local/include'],
-                      extra_compile_args = ['-Wall'],
-                      libraries=['memcache'],
-                      library_dirs=['/usr/local/lib'],
-                      extra_link_args=['--no-undefined', '-Wl,-rpath=/usr/local/lib'],
-                      define_macros=define,
-                      undef_macros=undefine)
+# This assumes that libmemcache is installed with base /usr/local
+cmemcache = Extension(
+    "_cmemcache",
+    sources,
+    include_dirs = ['/usr/local/include'],
+    extra_compile_args = ['-Wall'],
+    libraries=['memcache'],
+    library_dirs=['/usr/local/lib'],
+    extra_link_args=['--no-undefined', '-Wl,-rpath=/usr/local/lib'],
+    define_macros=define,
+    undef_macros=undefine)
 
 setup(name="cmemcache",
       version="1.0",
-      description="cmemcache -- compiled memcached interface",
-      long_description="cmemcache -- compiled memcached interface",
+      description="cmemcache -- memcached extension",
+      long_description="cmemcache -- memcached extension built on libmemcache",
       author="Gijsbert de Haan",
       author_email="gijsbert_de_haan@hotmail.com",
       maintainer="Gijsbert de Haan",
