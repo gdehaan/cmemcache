@@ -59,7 +59,7 @@ class TestCmemcache( unittest.TestCase ):
         """
         Test set, get, replace, add api.
         """
-        self.assert_(mc.set('blo', val) == ok)
+        self.failUnlessEqual(mc.set('blo', val), ok)
         self.failUnlessEqual(mc.get('blo'), val)
         mc.replace('blo', repval)
         self.failUnlessEqual(mc.get('blo'), repval)
@@ -171,6 +171,9 @@ class TestCmemcache( unittest.TestCase ):
             # not running, start one
             memcached = subprocess.Popen("memcached -m 10", shell=True)
             print 'memcached not running, starting one (pid %d)' % (memcached.pid,)
+            # give it some time to start
+            import time
+            time.sleep(0.5)
         s.close()
 
         # use memcache as the reference

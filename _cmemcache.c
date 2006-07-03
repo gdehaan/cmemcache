@@ -7,12 +7,16 @@
 #include <Python.h>
 #include "memcache.h"
 
+/*** Types ***/
+
 typedef struct 
 {
     PyObject_HEAD
     struct memcache* mc;
     int debug;
 } CmemcacheObject;
+
+/*** Defines ***/
 
 #ifdef NDEBUG
 #define debug(args)
@@ -21,6 +25,11 @@ typedef struct
 #define debug(args) printf args
 #define debug_def(args) args
 #endif
+
+/*** Forward Declarations ***/
+
+static void
+cmemcache_dealloc(CmemcacheObject* self);
 
 //----------------------------------------------------------------------------------------
 //
@@ -38,12 +47,7 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
     int error = 0;
     
     /* there seems to be no way to remove servers, so get rid of memcache all together */
-    if (self->mc)
-    {
-        debug(("free mc %p\n", self->mc));
-        mc_free(self->mc);
-        self->mc = NULL;
-    }
+    cmemcache_dealloc( self );
     assert(self->mc == NULL);
 
     /* create new instance */
@@ -94,11 +98,13 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
                     {
                         weight = 15;
                     }
+                    Py_BEGIN_ALLOW_THREADS;
                     for (i = 0; i < weight; ++i)
                     {
                         debug_def(int retval =) mc_server_add4(self->mc, cserver);
                         debug(("retval %d\n", retval));
                     }
+                    Py_END_ALLOW_THREADS;
                 }
             }
             else
@@ -158,8 +164,10 @@ cmemcache_dealloc(CmemcacheObject* self)
     
     if (self->mc)
     {
+        Py_BEGIN_ALLOW_THREADS;
         mc_free(self->mc);
         self->mc = NULL;
+        Py_END_ALLOW_THREADS;
     }
 }
 
@@ -190,9 +198,11 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
                            &key, &keylen, &value, &valuelen, &time, &flags))
         return NULL;
     
+    int retval = 0;
+    
+    Py_BEGIN_ALLOW_THREADS;
     debug(("cmemcache_store %d %s '%s' time %d flags %d\n",
            storeType, key, value, time, flags));
-    int retval = 0;
     switch(storeType)
     {
         case SET:
@@ -206,6 +216,8 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
             break;
     }
     debug(("retval = %d\n", retval));
+    Py_END_ALLOW_THREADS;
+    
     return PyInt_FromLong(retval);
 }
 
@@ -254,12 +266,16 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
     
     struct memcache_req *req;
     struct memcache_res *res;
+    
+    Py_BEGIN_ALLOW_THREADS;
     req = mc_req_new();
     res = mc_req_add(req, key, keylen);
     mc_res_free_on_delete(res, 1);
     mc_get(self->mc, req);
     debug(("attempt %d found %d res %d '%s'\n",
            mc_res_attempted(res), mc_res_found(res), res->size, (char*)res->val));
+    Py_END_ALLOW_THREADS;
+    
     PyObject* retval;
     if (mc_res_found(res))
     {
@@ -299,24 +315,6 @@ cmemcache_getflags(PyObject* pyself, PyObject* args)
 
 //----------------------------------------------------------------------------------------
 //
-static void get_multi_cb(MCM_CALLBACK_FUNC)
-{
-    debug(("get_multi_cb %p\n", MCM_CALLBACK_PTR));
-    PyObject* dict = (PyObject*)MCM_CALLBACK_PTR;
-    struct memcache_res *res = MCM_CALLBACK_RES;
-    debug(("add %s %s attempted %d found %d\n",
-           res->key, (char*)res->val, mc_res_attempted(res), mc_res_found(res)));
-    if(mc_res_found(res))
-    {
-        debug(("res found, add it\n"));
-        PyObject* key = PyString_FromStringAndSize(res->key, res->len);
-        PyObject* val = PyString_FromStringAndSize(res->val, res->size);
-        PyDict_SetItem(dict, key, val);
-    }
-}
-
-//----------------------------------------------------------------------------------------
-//
 static PyObject*
 cmemcache_get_multi(PyObject* pyself, PyObject* args)
 {
@@ -330,7 +328,6 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
 
     if (! PyArg_ParseTuple(args, "O", &keys))
         return NULL;
-    debug(("cmemcache_get_multi\n"));
     
     struct memcache_req *req;
     struct memcache_res *res;
@@ -338,7 +335,6 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
     const int size = PySequence_Size(keys);
     int i;
     int error = 0;
-    PyObject* dict = PyDict_New();
     for (i = 0; i < size && error == 0; ++i)
     {
         PyObject* key = NULL;
@@ -350,9 +346,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
             {
                 debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
                 res = mc_req_add(req, ckey, PyString_Size(key));
-                debug(("res %p val %p size %d\n", res, res->val, res->size));
                 mc_res_free_on_delete(res, 1);
-                mc_res_register_fetch_cb(req, res, get_multi_cb, dict);
             }
             else
             {
@@ -368,16 +362,28 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
         }
         Py_DECREF(key);
     }
+    PyObject* dict = PyDict_New();
     if (error)
     {
         debug(("error\n"));
-        PyDict_Clear(dict);
     }
     else
     {
-        debug(("before mc_get\n"));
+        Py_BEGIN_ALLOW_THREADS;
         mc_get(self->mc, req);
-        debug(("after mc_get\n"));
+        Py_END_ALLOW_THREADS;
+
+        // Put all the found results in the dictionary.
+        TAILQ_FOREACH(res, &req->query, entries)
+        {
+            if (mc_res_found(res))
+            {
+                debug(("res found, add %s\n", res->key));
+                PyObject* key = PyString_FromStringAndSize(res->key, res->len);
+                PyObject* val = PyString_FromStringAndSize(res->val, res->size);
+                PyDict_SetItem(dict, key, val);
+            }
+        }
     }
     mc_req_free(req);
 
@@ -401,10 +407,15 @@ cmemcache_delete(PyObject* pyself, PyObject* args)
 
     if (! PyArg_ParseTuple(args, "s#|i", &key, &keylen, &time))
         return NULL;
-    debug(("cmemcache_delete %s time %d\n", key, time));
 
-    int retval = mc_delete(self->mc, key, keylen, time);
+    int retval;
+    
+    Py_BEGIN_ALLOW_THREADS;
+    debug(("cmemcache_delete %s time %d\n", key, time));
+    retval = mc_delete(self->mc, key, keylen, time);
     debug(("retval = %d\n", retval));
+    Py_END_ALLOW_THREADS;
+    
     return PyInt_FromLong(retval);
 }
 
@@ -425,11 +436,15 @@ cmemcache_decr(PyObject* pyself, PyObject* args)
 
     if (! PyArg_ParseTuple(args, "s#i", &key, &keylen, &val))
         return NULL;
-    debug(("cmemcache_decr %s val %d\n", key, val));
 
     int newval;
+
+    Py_BEGIN_ALLOW_THREADS;
+    debug(("cmemcache_decr %s val %d\n", key, val));
     newval = mc_decr(self->mc, key, keylen, val);
     debug(("newval %d\n", newval));
+    Py_END_ALLOW_THREADS;
+    
     return PyInt_FromLong(newval);
 }
 
@@ -450,14 +465,16 @@ cmemcache_incr(PyObject* pyself, PyObject* args)
 
     if (! PyArg_ParseTuple(args, "s#i", &key, &keylen, &val))
         return NULL;
-    debug(("cmemcache_incr %s val %d\n", key, val));
 
     int newval;
+    
+    Py_BEGIN_ALLOW_THREADS;
+    debug(("cmemcache_incr %s val %d\n", key, val));
     newval = mc_incr(self->mc, key, keylen, val);
     debug(("newval %d\n", newval));
-    PyObject* retval;
-    retval = PyInt_FromLong(newval);
-    return retval;
+    Py_END_ALLOW_THREADS;
+    
+    return PyInt_FromLong(newval);
 }
 
 //----------------------------------------------------------------------------------------
@@ -478,7 +495,11 @@ cmemcache_get_stats(PyObject* pyself, PyObject* args)
     for (ms = self->mc->server_list.tqh_first; ms != NULL; ms = ms->entries.tqe_next)
     {
         struct memcache_server_stats* stats;
+        
+        Py_BEGIN_ALLOW_THREADS;
         stats = mc_server_stats(self->mc, ms);
+        Py_END_ALLOW_THREADS;
+        
         if (stats != NULL)
         {
             char buffer[128+1];
@@ -546,8 +567,11 @@ cmemcache_flush_all(PyObject* pyself, PyObject* args)
     debug(("cmemcache_flush_all\n"));
 
     assert(self->mc);
+    
+    Py_BEGIN_ALLOW_THREADS;
     debug_def(int retval =) mc_flush_all(self->mc);
     debug(("retval = %d\n", retval));
+    Py_END_ALLOW_THREADS;
     
     Py_INCREF(Py_None);
     return Py_None;
@@ -563,7 +587,10 @@ cmemcache_disconnect_all(PyObject* pyself, PyObject* args)
     debug(("cmemcache_disconnect_all\n"));
 
     assert(self->mc);
+
+    Py_BEGIN_ALLOW_THREADS;
     mc_server_disconnect_all(self->mc);
+    Py_END_ALLOW_THREADS;
     
     Py_INCREF(Py_None);
     return Py_None;
@@ -576,15 +603,19 @@ static PyMethodDef cmemcache_methods[] = {
     },
     {
         "set", cmemcache_set, METH_VARARGS,
-        "Client.set(key, value, time=0, flags=0) -- Unconditionally sets a key to a given value in the memcache.\n\n@return: Nonzero on success.\n@rtype: int\n"
+        "Client.set(key, value, time=0, flags=0) -- Unconditionally sets a key to a given value in the memcache.\n\n"
+        "@return: Nonzero on success.\n@rtype: int\n"
     },
     {
         "add", cmemcache_add, METH_VARARGS,
-        "add(key, value, time=0, flags=0) -- Add new key with value.\n\nLike L{set}, but only stores in memcache if the key doesn't already exist."
+        "add(key, value, time=0, flags=0) -- Add new key with value.\n\n"
+        "Like L{set}, but only stores in memcache if the key doesn't already exist."
     },
     {
         "replace", cmemcache_replace, METH_VARARGS,
-        "replace(key, value, time=0, flags=0) -- replace existing key with value.\n\nLike L{set}, but only stores in memcache if the key already exists.\nThe opposite of L{add}."
+        "replace(key, value, time=0, flags=0) -- replace existing key with value.\n\n"
+        "Like L{set}, but only stores in memcache if the key already exists.\n"
+        "The opposite of L{add}."
     },
     {
         "get", cmemcache_get, METH_VARARGS,
@@ -592,7 +623,8 @@ static PyMethodDef cmemcache_methods[] = {
     },
     {
         "getflags", cmemcache_getflags, METH_VARARGS,
-        "getflags(key) -- Retrieves a key from the memcache.\n\n@return: The (value,flags) or None."
+        "getflags(key) -- Retrieves a key from the memcache.\n\n"
+        "@return: The (value,flags) or None."
     },
     {
         "get_multi", cmemcache_get_multi, METH_VARARGS,
@@ -612,7 +644,8 @@ static PyMethodDef cmemcache_methods[] = {
     },
     {
         "delete", cmemcache_delete, METH_VARARGS,
-        "delete(key, time=0) -- Deletes a key from the memcache.\n\n@return: Nonzero on success.\n@rtype: int"
+        "delete(key, time=0) -- Deletes a key from the memcache.\n\n"
+        "@return: Nonzero on success.\n@rtype: int"
     },
     {
         "decr", cmemcache_decr, METH_VARARGS,
