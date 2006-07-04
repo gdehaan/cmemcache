@@ -9,8 +9,11 @@
 ..
     1  Description
     2  Dependencies
-    3  To do
-    4  Known Bugs
+    3  Download
+    4  To do
+    5  Known Bugs
+    6  Copyright and License
+    7  Author
 
 Description
 ===========
@@ -22,7 +25,12 @@ Dependencies
 ============
 
 - Python
-- libmemcache (using version 1.4.0.rc2, not sure which is required
+- libmemcache (using version 1.4.0.rc2, not sure which is required)
+
+Download
+========
+
+- `Download </downloads/cmemcache/>`_
 
 To do
 =====
@@ -34,4 +42,15 @@ Known Bugs
 
 - set_servers with the wrong port number causes a segfault (in libmemcache). See commented
   out testing code in test.py.
+
+Copyright and License
+=====================
+
+Copyright (C) 2006-2006  Gijsbert de Haan.
+This code is distributed under the `GNU General Public License <COPYING>`_.
+
+Author
+======
+
+Gijsbert de Haan <gijsbert_de_haan@hotmail.com>
 
