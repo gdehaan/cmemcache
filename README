@@ -1,31 +1,57 @@
 .. -*- mode: text -*-
 .. $Id$
 
-===============================
- Python extension to memcached
-===============================
+==================================
+ Python extension for libmemcache
+==================================
 
 .. contents::
 ..
     1  Description
-    2  Dependencies
-    3  Download
-    4  To do
-    5  Known Bugs
-    6  Copyright and License
-    7  Author
+    2  Motivation
+    3  Dependencies
+    4  Download
+    5  To do
+    6  Known Bugs
+    7  Copyright and License
+    8  Author
 
 Description
 ===========
 
-Python extension to memcached, build on top of libmemcache. API very similar to
-memcache.py, except for some return codes which follow libmemcache conventions.
+Python extension for `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_, the C
+API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API very similar to
+`python-memcache <ftp://ftp.tummy.com/pub/python-memcached/>`_, except for some return
+codes which follow libmemcache conventions.
+
+cmemcache is about 2 times faster then python-memcache.
+
+Motivation
+==========
+
+This extension was created after doing some timings on a simple session caching scheme
+where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
+expected it to be faster than that, since PostgreSQL does a lot more than memcached. It
+was suggested that it was perhaps python-memcachey, which for instance gets the initial
+part of the message from memcached byte for byte. After discovering libmemcache it seemed
+pretty straight forward to create an extension on top of that.
+
+cmemcache has 2 clients: StringClient and Client. StringClient is the extension that only
+supports python strings for values. The api was copied from python-memcache, except that
+it excepts strings only. Client is a module that implements caching of arbitrary python
+objects using Pickle on top of the StringClient. This code is a copy/paste from
+python-memcache. Most of the test code in `test.py <test.py>`_ is run on the cmemcache
+Client and the python-memcache Client to make sure that they are interchangeable. Although
+I have not tested this but it should be possible to mix cmemcache and python-memcache
+clients in a running system as well, since they use the same constants for encoding object
+types.
 
 Dependencies
 ============
 
 - Python
-- libmemcache (using version 1.4.0.rc2, not sure which is required)
+- `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_ (using version 1.4.0.rc2,
+  not sure which is required)
 
 Download
 ========
@@ -36,6 +62,7 @@ To do
 =====
 
 - use mc_req_add_ref to avoid copy of key
+- add performance test to test.py
 
 Known Bugs
 ==========
@@ -46,11 +73,11 @@ Known Bugs
 Copyright and License
 =====================
 
-Copyright (C) 2006-2006  Gijsbert de Haan.
+Copyright (C) 2006  Gijsbert de Haan.
 This code is distributed under the `GNU General Public License <COPYING>`_.
 
 Author
 ======
 
-Gijsbert de Haan <gijsbert_de_haan@hotmail.com>
+Gijsbert de Haan <gijsbert.de.haan@gmail.com>
 

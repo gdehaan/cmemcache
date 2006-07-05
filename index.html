@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
 <meta name="generator" content="Docutils 0.5: http://docutils.sourceforge.net/" />
-<title>Python extension to memcached</title>
+<title>Python extension for libmemcache</title>
 <link rel="stylesheet" href="style.css" type="text/css" />
 </head>
 <body>
@@ -16,69 +16,94 @@
 
 <div id="download-link"><a href="/downloads/cmemcache/">Download</a></div>
 
-<div class="document" id="python-extension-to-memcached">
-<h1 class="title">Python extension to memcached</h1>
+<div class="document" id="python-extension-for-libmemcache">
+<h1 class="title">Python extension for libmemcache</h1>
 
 <!-- -*- mode: text -*- -->
 <!-- $Id$ -->
 <div class="contents topic">
 <p class="topic-title first"><a id="contents" name="contents">Contents</a></p>
 <ul class="simple">
-<li><a class="reference" href="#description" id="id2" name="id2">Description</a></li>
-<li><a class="reference" href="#dependencies" id="id3" name="id3">Dependencies</a></li>
-<li><a class="reference" href="#download" id="id4" name="id4">Download</a></li>
-<li><a class="reference" href="#to-do" id="id5" name="id5">To do</a></li>
-<li><a class="reference" href="#known-bugs" id="id6" name="id6">Known Bugs</a></li>
-<li><a class="reference" href="#copyright-and-license" id="id7" name="id7">Copyright and License</a></li>
-<li><a class="reference" href="#author" id="id8" name="id8">Author</a></li>
+<li><a class="reference" href="#description" id="id3" name="id3">Description</a></li>
+<li><a class="reference" href="#motivation" id="id4" name="id4">Motivation</a></li>
+<li><a class="reference" href="#dependencies" id="id5" name="id5">Dependencies</a></li>
+<li><a class="reference" href="#download" id="id6" name="id6">Download</a></li>
+<li><a class="reference" href="#to-do" id="id7" name="id7">To do</a></li>
+<li><a class="reference" href="#known-bugs" id="id8" name="id8">Known Bugs</a></li>
+<li><a class="reference" href="#copyright-and-license" id="id9" name="id9">Copyright and License</a></li>
+<li><a class="reference" href="#author" id="id10" name="id10">Author</a></li>
 </ul>
 </div>
 <!-- 1  Description
-2  Dependencies
-3  Download
-4  To do
-5  Known Bugs
-6  Copyright and License
-7  Author -->
+2  Motivation
+3  Dependencies
+4  Download
+5  To do
+6  Known Bugs
+7  Copyright and License
+8  Author -->
 <div class="section">
-<h1><a class="toc-backref" href="#id2" id="description" name="description">Description</a></h1>
-<p>Python extension to memcached, build on top of libmemcache. API very similar to
-memcache.py, except for some return codes which follow libmemcache conventions.</p>
+<h1><a class="toc-backref" href="#id3" id="description" name="description">Description</a></h1>
+<p>Python extension for <a class="reference" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a>, the C
+API to <a class="reference" href="http://www.danga.com/memcached/">memcached</a>. cmemcache API very similar to
+<a class="reference" href="ftp://ftp.tummy.com/pub/python-memcached/">python-memcache</a>, except for some return
+codes which follow libmemcache conventions.</p>
+<p>cmemcache is about 2 times faster then python-memcache.</p>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id3" id="dependencies" name="dependencies">Dependencies</a></h1>
+<h1><a class="toc-backref" href="#id4" id="motivation" name="motivation">Motivation</a></h1>
+<p>This extension was created after doing some timings on a simple session caching scheme
+where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
+expected it to be faster than that, since PostgreSQL does a lot more than memcached. It
+was suggested that it was perhaps python-memcachey, which for instance gets the initial
+part of the message from memcached byte for byte. After discovering libmemcache it seemed
+pretty straight forward to create an extension on top of that.</p>
+<p>cmemcache has 2 clients: StringClient and Client. StringClient is the extension that only
+supports python strings for values. The api was copied from python-memcache, except that
+it excepts strings only. Client is a module that implements caching of arbitrary python
+objects using Pickle on top of the StringClient. This code is a copy/paste from
+python-memcache. Most of the test code in <a class="reference" href="test.py">test.py</a> is run on the cmemcache
+Client and the python-memcache Client to make sure that they are interchangeable. Although
+I have not tested this but it should be possible to mix cmemcache and python-memcache
+clients in a running system as well, since they use the same constants for encoding object
+types.</p>
+</div>
+<div class="section">
+<h1><a class="toc-backref" href="#id5" id="dependencies" name="dependencies">Dependencies</a></h1>
 <ul class="simple">
 <li>Python</li>
-<li>libmemcache (using version 1.4.0.rc2, not sure which is required)</li>
+<li><a class="reference" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a> (using version 1.4.0.rc2,
+not sure which is required)</li>
 </ul>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id4" id="download" name="download">Download</a></h1>
+<h1><a class="toc-backref" href="#id6" id="download" name="download">Download</a></h1>
 <ul class="simple">
 <li><a class="reference" href="/downloads/cmemcache/">Download</a></li>
 </ul>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id5" id="to-do" name="to-do">To do</a></h1>
+<h1><a class="toc-backref" href="#id7" id="to-do" name="to-do">To do</a></h1>
 <ul class="simple">
 <li>use mc_req_add_ref to avoid copy of key</li>
+<li>add performance test to test.py</li>
 </ul>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id6" id="known-bugs" name="known-bugs">Known Bugs</a></h1>
+<h1><a class="toc-backref" href="#id8" id="known-bugs" name="known-bugs">Known Bugs</a></h1>
 <ul class="simple">
 <li>set_servers with the wrong port number causes a segfault (in libmemcache). See commented
 out testing code in test.py.</li>
 </ul>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id7" id="copyright-and-license" name="copyright-and-license">Copyright and License</a></h1>
-<p>Copyright (C) 2006-2006  Gijsbert de Haan.
+<h1><a class="toc-backref" href="#id9" id="copyright-and-license" name="copyright-and-license">Copyright and License</a></h1>
+<p>Copyright (C) 2006  Gijsbert de Haan.
 This code is distributed under the <a class="reference" href="COPYING">GNU General Public License</a>.</p>
 </div>
 <div class="section">
-<h1><a class="toc-backref" href="#id8" id="author" name="author">Author</a></h1>
-<p>Gijsbert de Haan &lt;<a class="reference" href="mailto:gijsbert_de_haan&#64;hotmail.com">gijsbert_de_haan&#64;hotmail.com</a>&gt;</p>
+<h1><a class="toc-backref" href="#id10" id="author" name="author">Author</a></h1>
+<p>Gijsbert de Haan &lt;<a class="reference" href="mailto:gijsbert.de.haan&#64;gmail.com">gijsbert.de.haan&#64;gmail.com</a>&gt;</p>
 </div>
 </div>
 </body>

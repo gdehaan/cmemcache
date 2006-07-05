@@ -677,7 +677,7 @@ static PyMethodDef cmemcache_methods[] = {
 static PyTypeObject cmemcache_CmemcacheType = {
     PyObject_HEAD_INIT(NULL)
     0,                         /*ob_size*/
-    "Client",                  /*tp_name*/
+    "StringClient",            /*tp_name*/
     sizeof(CmemcacheObject),   /*tp_basicsize*/
     0,                         /*tp_itemsize*/
     (destructor)cmemcache_dealloc,         /*tp_dealloc*/
@@ -744,10 +744,10 @@ init_cmemcache(void)
         return;
 
     m = Py_InitModule3("_cmemcache", cmemcache_module_methods,
-                       "Fast client to memcached.");
+                       "Extension to memcached using libmemcache.");
 
     Py_INCREF(&cmemcache_CmemcacheType);
-    PyModule_AddObject(m, "Client", (PyObject *)&cmemcache_CmemcacheType);
+    PyModule_AddObject(m, "StringClient", (PyObject *)&cmemcache_CmemcacheType);
 }
 
 /*
