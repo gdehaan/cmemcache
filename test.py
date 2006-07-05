@@ -44,7 +44,7 @@ class TestCmemcache( unittest.TestCase ):
         """
         Test cmemcache specifics.
         """
-        mc = mcm.Client(self.servers)
+        mc = mcm.StringClient(self.servers)
         mc.set('blo', 'blu', 0, 12)
         self.failUnlessEqual(mc.get('blo'), 'blu')
         self.failUnlessEqual(mc.getflags('blo'), ('blu', 12))
@@ -73,9 +73,9 @@ class TestCmemcache( unittest.TestCase ):
         mc.add('blo', repval)
         self.failUnlessEqual(mc.get('blo'), repval)
 
-    def _test(self, mcm, ok):
+    def _test_base(self, mcm, mc, ok):
         """
-        The test.
+        The base test, uses string values only.
 
         The return codes are not compatible between memcache and cmemcache.  memcache
         return 1 for any reply from memcached, and cmemcache returns the return code
@@ -88,8 +88,6 @@ class TestCmemcache( unittest.TestCase ):
         """
 
         print 'testing', mcm
-        # setup
-        mc = mcm.Client(self.servers, debug=1)
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
@@ -145,12 +143,12 @@ class TestCmemcache( unittest.TestCase ):
 
         mc.disconnect_all()
 
-    def _test_pickleClient(self, mcm, ok):
+    def _test_client(self, mcm, ok):
         """
-        Test PickleClient, only need to test the set, get, add, replace, rest is
-        implemented by Client base.
+        Test Client, only need to test the set, get, add, replace, rest is
+        implemented by test_memcache().
         """
-        mc = mcm.PickleClient(self.servers)
+        mc = mcm.Client(self.servers)
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
@@ -182,13 +180,14 @@ class TestCmemcache( unittest.TestCase ):
         except ImportError:
             pass
         else:
-            self._test(memcache, ok=1)
+            self._test_base(memcache, memcache.Client(self.servers, debug=1), ok=1)
+            self._test_client(memcache, ok=1)
         
         # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)
-        self._test_pickleClient(cmemcache, ok=0)
-        self._test(cmemcache, ok=0)
+        self._test_base(cmemcache, cmemcache.Client(self.servers, debug=1), ok=0)
+        self._test_client(cmemcache, ok=0)
 
         # if we created memcached for our test, then shut it down
         if memcached:
