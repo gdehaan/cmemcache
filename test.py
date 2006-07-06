@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # $Id$
 #
@@ -87,7 +88,7 @@ class TestCmemcache( unittest.TestCase ):
 
         """
 
-        print 'testing', mcm
+        print 'testing', mc, '\n\tfrom', mcm
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
@@ -109,7 +110,12 @@ class TestCmemcache( unittest.TestCase ):
         test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
 
         # get stats
-        print mc.get_stats()
+        stats = mc.get_stats()
+        self.failUnlessEqual(len(stats), 1)
+        self.assert_(self.servers[0] in stats[0][0])
+        self.assert_('total_items' in stats[0][1])
+        self.assert_('bytes_read' in stats[0][1])
+        self.assert_('bytes_written' in stats[0][1])
         
         # set_servers to none
         mc.set_servers([])
@@ -134,6 +140,9 @@ class TestCmemcache( unittest.TestCase ):
         mc.set_servers(self.servers)
         test_setget(mc, 'bla', 'bli', self.failUnlessEqual)
         test_setget(mc, 'blo', 'blu', self.failUnlessEqual)
+
+        # test unicode
+        test_setget(mc, 'blo', '© 2006', self.failUnlessEqual)
 
         # flush_all
         # fixme: how to test this?
@@ -180,13 +189,14 @@ class TestCmemcache( unittest.TestCase ):
         except ImportError:
             pass
         else:
-            self._test_base(memcache, memcache.Client(self.servers, debug=1), ok=1)
+            self._test_base(memcache, memcache.Client(self.servers), ok=1)
             self._test_client(memcache, ok=1)
         
         # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)
-        self._test_base(cmemcache, cmemcache.Client(self.servers, debug=1), ok=0)
+        self._test_base(cmemcache, cmemcache.StringClient(self.servers), ok=0)
+        self._test_base(cmemcache, cmemcache.Client(self.servers), ok=0)
         self._test_client(cmemcache, ok=0)
 
         # if we created memcached for our test, then shut it down

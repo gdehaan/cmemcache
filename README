@@ -20,11 +20,12 @@ Description
 ===========
 
 Python extension for `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_, the C
-API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API very similar to
+API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API is very similar to
 `python-memcache <ftp://ftp.tummy.com/pub/python-memcached/>`_, except for some return
 codes which follow libmemcache conventions.
 
-cmemcache is about 2 times faster then python-memcache.
+cmemcache is about 2 times faster then python-memcache with short key names (8
+characters), faster with larger key names.
 
 Motivation
 ==========
@@ -45,6 +46,11 @@ Client and the python-memcache Client to make sure that they are interchangeable
 I have not tested this but it should be possible to mix cmemcache and python-memcache
 clients in a running system as well, since they use the same constants for encoding object
 types.
+
+The speed difference would be less if the memcached protocol would be changed to precede
+the reply header with its size. A client could then read the header size, read the full
+header (in one read), parse header to get the data size, and read data (this is already
+done in one read).
 
 Dependencies
 ============
@@ -69,6 +75,9 @@ Known Bugs
 
 - set_servers with the wrong port number causes a segfault (in libmemcache). See commented
   out testing code in test.py.
+
+- mc_err_filter_add() broken, I have a fix for this, but I have not send a patch to
+  libmemcache maintainers. This (can) results in warnings on add() and replace().
 
 Copyright and License
 =====================

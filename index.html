@@ -45,10 +45,11 @@
 <div class="section">
 <h1><a class="toc-backref" href="#id3" id="description" name="description">Description</a></h1>
 <p>Python extension for <a class="reference" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a>, the C
-API to <a class="reference" href="http://www.danga.com/memcached/">memcached</a>. cmemcache API very similar to
+API to <a class="reference" href="http://www.danga.com/memcached/">memcached</a>. cmemcache API is very similar to
 <a class="reference" href="ftp://ftp.tummy.com/pub/python-memcached/">python-memcache</a>, except for some return
 codes which follow libmemcache conventions.</p>
-<p>cmemcache is about 2 times faster then python-memcache.</p>
+<p>cmemcache is about 2 times faster then python-memcache with short key names (8
+characters), faster with larger key names.</p>
 </div>
 <div class="section">
 <h1><a class="toc-backref" href="#id4" id="motivation" name="motivation">Motivation</a></h1>
@@ -67,6 +68,10 @@ Client and the python-memcache Client to make sure that they are interchangeable
 I have not tested this but it should be possible to mix cmemcache and python-memcache
 clients in a running system as well, since they use the same constants for encoding object
 types.</p>
+<p>The speed difference would be less if the memcached protocol would be changed to precede
+the reply header with its size. A client could then read the header size, read the full
+header (in one read), parse header to get the data size, and read data (this is already
+done in one read).</p>
 </div>
 <div class="section">
 <h1><a class="toc-backref" href="#id5" id="dependencies" name="dependencies">Dependencies</a></h1>
@@ -94,6 +99,8 @@ not sure which is required)</li>
 <ul class="simple">
 <li>set_servers with the wrong port number causes a segfault (in libmemcache). See commented
 out testing code in test.py.</li>
+<li>mc_err_filter_add() broken, I have a fix for this, but I have not send a patch to
+libmemcache maintainers. This (can) results in warnings on add() and replace().</li>
 </ul>
 </div>
 <div class="section">
