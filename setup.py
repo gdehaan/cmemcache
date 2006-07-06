@@ -1,6 +1,21 @@
+#!/usr/bin/env python
+
+"""
+Install script for cmemcache extension.
+"""
+
+__author__ = "Gijsbert de Haan <gijsbert.de.haan@gmail.com>"
+
 from distutils.core import setup, Extension
 import sys
 from glob import glob
+
+def read_version():
+    try:
+        return open('VERSION', 'r').readline().strip()
+    except IOError, e:
+        raise SystemExit(
+            "Error: you must run setup from the root directory (%s)" % str(e))
 
 sources = glob("*.c")
 undefine = []
@@ -26,14 +41,13 @@ cmemcache = Extension(
     undef_macros=undefine)
 
 setup(name="cmemcache",
-      version="1.0",
+      version=read_version(),
       description="cmemcache -- memcached extension",
-      long_description="cmemcache -- memcached extension built on libmemcache",
+      long_description="cmemcache -- memcached extension for libmemcache",
       author="Gijsbert de Haan",
-      author_email="gijsbert_de_haan@hotmail.com",
-      maintainer="Gijsbert de Haan",
-      maintainer_email="gijsbert_de_haan@hotmail.com",
-      url="http://gijsbert.org/",
+      author_email="gijsbert.de.haan@gmail.com",
+      url="http://gijsbert.org/cmemcache",
       license="GNU General Public License (GPL)",
       py_modules = ['cmemcache'],
-      ext_modules=[cmemcache])
+      ext_modules=[cmemcache]
+      )
