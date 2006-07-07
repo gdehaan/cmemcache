@@ -422,29 +422,41 @@ cmemcache_delete(PyObject* pyself, PyObject* args)
 //----------------------------------------------------------------------------------------
 //
 static PyObject*
-cmemcache_decr(PyObject* pyself, PyObject* args)
+cmemcache_incr_decr(PyObject* pyself, PyObject* args, int incr)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
     
-    debug(("cmemcache_decr\n"));
+    debug(("cmemcache_incr_decr\n"));
 
     assert(self->mc);
     
     char* key = NULL;
     int keylen = 0;
-    int val = 0;
+    int delta = 1;
 
-    if (! PyArg_ParseTuple(args, "s#i", &key, &keylen, &val))
+    if (! PyArg_ParseTuple(args, "s#|i", &key, &keylen, &delta))
         return NULL;
 
     int newval;
-
-    Py_BEGIN_ALLOW_THREADS;
-    debug(("cmemcache_decr %s val %d\n", key, val));
-    newval = mc_decr(self->mc, key, keylen, val);
-    debug(("newval %d\n", newval));
-    Py_END_ALLOW_THREADS;
     
+    Py_BEGIN_ALLOW_THREADS;
+    debug(("cmemcache_incr_decr %s %s delta %d\n", incr ? "incr" : "decr", key, delta));
+    if ( incr )
+    {
+        newval = mc_incr(self->mc, key, keylen, delta);
+    }
+    else
+    {
+        newval = mc_decr(self->mc, key, keylen, delta);
+    }
+    debug(("newval %d errnum %d\n", newval, mc_global_ctxt()->errnum));
+    Py_END_ALLOW_THREADS;
+
+    if ( mc_global_ctxt()->errnum )
+    {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
     return PyInt_FromLong(newval);
 }
 
@@ -453,28 +465,15 @@ cmemcache_decr(PyObject* pyself, PyObject* args)
 static PyObject*
 cmemcache_incr(PyObject* pyself, PyObject* args)
 {
-    CmemcacheObject* self = (CmemcacheObject*)pyself;
-    
-    debug(("cmemcache_incr\n"));
+    return cmemcache_incr_decr( pyself, args, 1 );
+}
 
-    assert(self->mc);
-    
-    char* key = NULL;
-    int keylen = 0;
-    int val = 0;
-
-    if (! PyArg_ParseTuple(args, "s#i", &key, &keylen, &val))
-        return NULL;
-
-    int newval;
-    
-    Py_BEGIN_ALLOW_THREADS;
-    debug(("cmemcache_incr %s val %d\n", key, val));
-    newval = mc_incr(self->mc, key, keylen, val);
-    debug(("newval %d\n", newval));
-    Py_END_ALLOW_THREADS;
-    
-    return PyInt_FromLong(newval);
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
+cmemcache_decr(PyObject* pyself, PyObject* args)
+{
+    return cmemcache_incr_decr( pyself, args, 0 );
 }
 
 //----------------------------------------------------------------------------------------
@@ -599,33 +598,39 @@ cmemcache_disconnect_all(PyObject* pyself, PyObject* args)
 static PyMethodDef cmemcache_methods[] = {
     {
         "set_servers", cmemcache_set_servers, METH_O,
-        "Client.set_servers(servers) -- set memcached servers"
+        "set_servers(servers) -- set memcached servers"
     },
+    
     {
         "set", cmemcache_set, METH_VARARGS,
-        "Client.set(key, value, time=0, flags=0) -- Unconditionally sets a key to a given value in the memcache.\n\n"
+        "set(key, value, time=0, flags=0) -- Unconditionally sets a key to a given value in the memcache.\n\n"
         "@return: Nonzero on success.\n@rtype: int\n"
     },
+    
     {
         "add", cmemcache_add, METH_VARARGS,
         "add(key, value, time=0, flags=0) -- Add new key with value.\n\n"
         "Like L{set}, but only stores in memcache if the key doesn't already exist."
     },
+    
     {
         "replace", cmemcache_replace, METH_VARARGS,
         "replace(key, value, time=0, flags=0) -- replace existing key with value.\n\n"
         "Like L{set}, but only stores in memcache if the key already exists.\n"
         "The opposite of L{add}."
     },
+    
     {
         "get", cmemcache_get, METH_VARARGS,
         "get(key) -- Retrieves a key from the memcache.\n\n@return: The value or None."
     },
+    
     {
         "getflags", cmemcache_getflags, METH_VARARGS,
         "getflags(key) -- Retrieves a key from the memcache.\n\n"
         "@return: The (value,flags) or None."
     },
+    
     {
         "get_multi", cmemcache_get_multi, METH_VARARGS,
         "get_multi(keys) --\n"
@@ -642,19 +647,52 @@ static PyMethodDef cmemcache_methods[] = {
         "@param keys: An array of keys.\n"
         "@return:  A dictionary of key/value pairs that were available.\n"
     },
+    
     {
         "delete", cmemcache_delete, METH_VARARGS,
         "delete(key, time=0) -- Deletes a key from the memcache.\n\n"
         "@return: Nonzero on success.\n@rtype: int"
     },
-    {
-        "decr", cmemcache_decr, METH_VARARGS,
-        "decr(key, val) -- decrement key's value with val, returns new value"
-    },
+    
     {
         "incr", cmemcache_incr, METH_VARARGS,
-        "incr(key, val) -- increment key's value with val, returns new value"
+        "incr(key, delta=1)\n"
+        "\n"
+        "Sends a command to the server to atomically increment the value for C{key} by\n"
+        "C{delta}, or by 1 if C{delta} is unspecified.  Returns None if C{key} doesn't\n"
+        "exist on server, otherwise it returns the new value after incrementing.\n"
+        "\n"
+        "Note that the value for C{key} must already exist in the memcache, and it\n"
+        "must be the string representation of an integer.\n"
+        "\n"
+        ">>> mc.set(\"counter\", \"20\")  # returns 1, indicating success\n"
+        "1\n"
+        ">>> mc.incr(\"counter\")\n"
+        "21\n"
+        ">>> mc.incr(\"counter\")\n"
+        "22\n"
+        "\n"
+        "Overflow on server is not checked.  Be aware of values approaching\n"
+        "2**32.  See L{decr}.\n"
+        "\n"
+        "@param delta: Integer amount to increment by (should be zero or greater).\n"
+        "@return: New value after incrementing.\n"
+        "@rtype: int or None if C{key} doesn't exist\n"
     },
+    
+    {
+        "decr", cmemcache_decr, METH_VARARGS,
+        "decr(key, delta=1)\n"
+        "\n"
+        "Like L{incr}, but decrements.  Unlike L{incr}, underflow is checked and\n"
+        "new values are capped at 0.  If server value is 1, a decrement of 2\n"
+        "returns 0, not -1.\n"
+        "\n"
+        "@param delta: Integer amount to decrement by (should be zero or greater).\n"
+        "@return: New value after decrementing.\n"
+        "@rtype: int or None if C{key} doesn't exist\n"
+    },
+    
     {
         "get_stats", cmemcache_get_stats, METH_NOARGS,
         "get_stats() -- Get statistics from all servers.\n"
@@ -663,10 +701,12 @@ static PyMethodDef cmemcache_methods[] = {
         "the name of the status field and the string value associated with\n"
         "it.  The values are not converted from strings."
     },
+    
     {
         "flush_all", cmemcache_flush_all, METH_NOARGS,
         "flush_all() -- flush all keys on all servers"
     },
+    
     {
         "disconnect_all", cmemcache_disconnect_all, METH_NOARGS,
         "disconnect_all() -- disconnect all servers"

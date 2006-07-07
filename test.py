@@ -50,11 +50,24 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.get('blo'), 'blu')
         self.failUnlessEqual(mc.getflags('blo'), ('blu', 12))
 
+        self.failUnlessEqual(mc.incr('nonexistantnumber'), None)
+        self.failUnlessEqual(mc.decr('nonexistantnumber'), None)
+
         # try weird server formats
         # number is not a server
         self.failUnlessRaises(TypeError, lambda: mc.set_servers([12]))
         # forget port
         self.failUnlessRaises(TypeError, lambda: mc.set_servers(['12']))
+        
+    def _test_memcache(self, mcm):
+        """
+        Test memcache specifics.
+        """
+        mc = mcm.Client(self.servers)
+        mc.set('blo', 'blu')
+        self.failUnlessEqual(mc.get('blo'), 'blu')
+        self.failUnlessRaises(ValueError, lambda: mc.decr('nonexistantnumber'))
+        self.failUnlessRaises(ValueError, lambda: mc.incr('nonexistantnumber'))
         
     def _test_sgra(self, mc, val, repval, norepval, ok):
         """
@@ -100,6 +113,8 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.incr('number', 3), 8)
         self.failUnlessEqual(mc.decr('number', 2), 6)
         self.failUnlessEqual(mc.get('number'), '6')
+        self.failUnlessEqual(mc.incr('number'), 7)
+        self.failUnlessEqual(mc.decr('number'), 6)
 
         mc.set('blo', 'bli')
         self.failUnlessEqual(mc.get('blo'), 'bli')
@@ -189,6 +204,7 @@ class TestCmemcache( unittest.TestCase ):
         except ImportError:
             pass
         else:
+            self._test_memcache(memcache)
             self._test_base(memcache, memcache.Client(self.servers), ok=1)
             self._test_client(memcache, ok=1)
         
