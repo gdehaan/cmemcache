@@ -33,7 +33,7 @@ Motivation
 This extension was created after doing some timings on a simple session caching scheme
 where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
 expected it to be faster than that, since PostgreSQL does a lot more than memcached. It
-was suggested that it was perhaps python-memcachey, which for instance gets the initial
+was suggested that it was perhaps python-memcache, which for instance gets the initial
 part of the message from memcached byte for byte. After discovering libmemcache it seemed
 pretty straight forward to create an extension on top of that.
 
