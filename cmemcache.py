@@ -70,8 +70,7 @@ class Client(StringClient):
     _FLAG_INTEGER = 1<<1
     _FLAG_LONG    = 1<<2
 
-    @staticmethod
-    def _convert(val):
+    def _convert(self, val):
         """
         Convert val to str, flags tuple.
         """
