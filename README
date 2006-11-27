@@ -79,6 +79,17 @@ Known Bugs
 - mc_err_filter_add() broken, I have a fix for this, but I have not send a patch to
   libmemcache maintainers. This (can) results in warnings on add() and replace().
 
+Changes
+=======
+
+Versions:
+
+0.91
+  Remove ``@staticmethod`` from ``_convert`` method to make it python 2.3 compatible.
+
+0.90
+  Initial version.
+
 Copyright and License
 =====================
 
