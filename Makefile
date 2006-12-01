@@ -11,7 +11,7 @@ all: index.html
 # style, otherwise fall back to default
 RST2HTML ?= $(wildcard $(PROJECTS)/projects/bin/projects-rst2html)
 ifeq ($(strip $(RST2HTML)),)
-RST2HTML = rst2html.py
+RST2HTML = rst2html.py --no-raw -r 3
 else
 RST2HTML += --project-header
 endif

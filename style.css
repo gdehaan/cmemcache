@@ -1,5 +1,6 @@
 @import url("/docutils-style.css");
 @import url("/project.css");
+@import url("/style.css");
 
 div#project-header {
   background-image: url("etc/header.jpg");

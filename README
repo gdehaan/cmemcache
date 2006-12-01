@@ -30,6 +30,9 @@ characters), faster with larger key names.
 Motivation
 ==========
 
+.. raw:: html
+   :file: ../gijsbert.org/vads.html
+
 This extension was created after doing some timings on a simple session caching scheme
 where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
 expected it to be faster than that, since PostgreSQL does a lot more than memcached. It
@@ -55,7 +58,7 @@ done in one read).
 Dependencies
 ============
 
-- Python
+- `Python <http://www.python.org>`_
 - `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_ (using version 1.4.0.rc2,
   not sure which is required)
 
