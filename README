@@ -76,11 +76,35 @@ To do
 Known Bugs
 ==========
 
+cmemcache:
+
+- Aborting errors are not converted into python exceptions.
+
+libmemcache:
+
 - set_servers with the wrong port number causes a segfault (in libmemcache). See commented
   out testing code in test.py.
 
-- mc_err_filter_add() broken, I have a fix for this, but I have not send a patch to
-  libmemcache maintainers. This (can) results in warnings on add() and replace().
+- mc_err_filter_add() broken. This results in warnings on add() and replace().
+
+  This is fixed by applying the patch from the download section.
+
+- libmemcache-1.4.0.rc2 is not compatible with memcached 1.2.1, this results in get_stats
+  returning no stats.
+
+- start memcached, create Client, kill memcached, start memcached, do a get() and python
+  process exits, with messages like::
+
+    [ERROR@1170236923.979369] mcm_buf_read():361: read(2) failed: Operation now in progress:
+    server unexpectedly closed connection
+
+  libmemcache does an exit on severe errors. It is possible to install an error handler
+  that could change the severity to not exit and then the python extension could throw a
+  python exception. However, I do not know if libmemcache will recover correctly.
+
+  I do not have time at the moment to try and fix this.
+
+  Reported by Mark and Philip, 31/01/2007.
 
 Changes
 =======
@@ -96,7 +120,7 @@ Versions:
 Copyright and License
 =====================
 
-Copyright (C) 2006  Gijsbert de Haan.
+Copyright (C) 2006-2007  Gijsbert de Haan.
 This code is distributed under the `GNU General Public License <COPYING>`_.
 
 Author

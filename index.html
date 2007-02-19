@@ -111,11 +111,33 @@ not sure which is required)</li>
 </div>
 <div class="section">
 <h1><a class="toc-backref" href="#id8" id="known-bugs" name="known-bugs">Known Bugs</a></h1>
+<p>cmemcache:</p>
 <ul class="simple">
-<li>set_servers with the wrong port number causes a segfault (in libmemcache). See commented
-out testing code in test.py.</li>
-<li>mc_err_filter_add() broken, I have a fix for this, but I have not send a patch to
-libmemcache maintainers. This (can) results in warnings on add() and replace().</li>
+<li>Aborting errors are not converted into python exceptions.</li>
+</ul>
+<p>libmemcache:</p>
+<ul>
+<li><p class="first">set_servers with the wrong port number causes a segfault (in libmemcache). See commented
+out testing code in test.py.</p>
+</li>
+<li><p class="first">mc_err_filter_add() broken. This results in warnings on add() and replace().</p>
+<p>This is fixed by applying the patch from the download section.</p>
+</li>
+<li><p class="first">libmemcache-1.4.0.rc2 is not compatible with memcached 1.2.1, this results in get_stats
+returning no stats.</p>
+</li>
+<li><p class="first">start memcached, create Client, kill memcached, start memcached, do a get() and python
+process exits, with messages like:</p>
+<pre class="literal-block">
+[ERROR&#64;1170236923.979369] mcm_buf_read():361: read(2) failed: Operation now in progress:
+server unexpectedly closed connection
+</pre>
+<p>libmemcache does an exit on severe errors. It is possible to install an error handler
+that could change the severity to not exit and then the python extension could throw a
+python exception. However, I do not know if libmemcache will recover correctly.</p>
+<p>I do not have time at the moment to try and fix this.</p>
+<p>Reported by Mark and Philip, 31/01/2007.</p>
+</li>
 </ul>
 </div>
 <div class="section">
@@ -130,7 +152,7 @@ libmemcache maintainers. This (can) results in warnings on add() and replace().<
 </div>
 <div class="section">
 <h1><a class="toc-backref" href="#id10" id="copyright-and-license" name="copyright-and-license">Copyright and License</a></h1>
-<p>Copyright (C) 2006  Gijsbert de Haan.
+<p>Copyright (C) 2006-2007  Gijsbert de Haan.
 This code is distributed under the <a class="reference" href="COPYING">GNU General Public License</a>.</p>
 </div>
 <div class="section">
