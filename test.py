@@ -101,7 +101,7 @@ class TestCmemcache( unittest.TestCase ):
 
         """
 
-        print 'testing', mc, '\n\tfrom', mcm
+        print 'testing', mc, 'version', mcm.__version__, '\n\tfrom', mcm
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
@@ -181,6 +181,15 @@ class TestCmemcache( unittest.TestCase ):
         norepval = {'blo':12}
         self._test_sgra(mc, val, repval, norepval, ok)
 
+    def _test_no_memcached(self, mc):
+        """
+        Test mc when there is no memcached running (anymore).
+        """
+
+        # No memcached so should get no value
+        self.failUnlessEqual(mc.get('bla'), None)
+        self.failUnlessEqual(mc.set('bla', 'bli'), 0)
+
     def test_memcache(self):
         # quick check if memcached is running
         ip, port = self.servers[0].split(':')
@@ -199,25 +208,30 @@ class TestCmemcache( unittest.TestCase ):
         s.close()
 
         # use memcache as the reference
+        mc = None
         try:
             import memcache
         except ImportError:
             pass
         else:
             self._test_memcache(memcache)
-            self._test_base(memcache, memcache.Client(self.servers), ok=1)
+            mc = memcache.Client(self.servers)
+            self._test_base(memcache, mc, ok=1)
             self._test_client(memcache, ok=1)
         
         # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)
-        self._test_base(cmemcache, cmemcache.StringClient(self.servers), ok=0)
-        self._test_base(cmemcache, cmemcache.Client(self.servers), ok=0)
-        self._test_client(cmemcache, ok=0)
+        self._test_base(cmemcache, cmemcache.StringClient(self.servers), ok=1)
+        cmc = cmemcache.Client(self.servers)
+        self._test_base(cmemcache, cmc, ok=1)
+        self._test_client(cmemcache, ok=1)
 
         # if we created memcached for our test, then shut it down
         if memcached:
             os.kill(memcached.pid, signal.SIGINT)
+            self._test_no_memcached(cmc)
+            self._test_no_memcached(mc)
 
 if __name__ == '__main__':
     unittest.main()
