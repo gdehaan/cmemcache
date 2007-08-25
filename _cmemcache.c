@@ -13,7 +13,12 @@ typedef struct
 {
     PyObject_HEAD
     struct memcache* mc;
+    struct memcache_err_ctxt mc_err_ctxt;/* to pass in ourself to collect exception info */
+    mcErrFunc mcErr;
+    struct memcache_ctxt* mc_ctxt;       /* to hold a pointer to mc_err_ctxt */
     int debug;
+    int throwException;
+    char exceptionStr[256];
 } CmemcacheObject;
 
 /*** Defines ***/
@@ -31,6 +36,62 @@ typedef struct
 static void
 cmemcache_dealloc(CmemcacheObject* self);
 
+static mcErrFunc mcErr = 0;
+
+//----------------------------------------------------------------------------------------
+//
+static int32_t errFunc(MCM_ERR_FUNC_ARGS)
+{
+    const struct memcache_ctxt *ctxt;
+    struct memcache_err_ctxt *ectxt;
+
+    MCM_ERR_INIT_CTXT(ctxt, ectxt);
+
+    debug(("ctxt %p ectxt %p\n", ctxt, ectxt));
+    debug(("errFunc sev %2d cont=%c misc %p %s:%d %s errnum %d:%s\n",
+           ectxt->severity, ectxt->cont, ectxt->misc,
+           ectxt->funcname, ectxt->lineno,
+           ectxt->errstr,
+           ectxt->errnum, strerror(ectxt->errnum)));
+
+    /*
+      Dang, ectxt->misc is reset in mcm_err() (through that bzero), so we can't use
+      misc to get our CmemcacheObject.
+    */
+    CmemcacheObject* self = (CmemcacheObject*) ectxt->misc;
+    /* Outputing the errors is confusing, so don't output anything */
+    if (self && self->mcErr)
+    {
+        self->mcErr(ctxt, ectxt);
+    }
+    else if (mcErr)
+    {
+        mcErr(ctxt, ectxt);
+    }
+    /* FIXME */
+    
+    // Throw an exception for errors that will exit/abort.
+    if (ectxt->cont == 'n' || ectxt->cont == 'a')
+    {
+        if (self)
+        {
+            CmemcacheObject* self = (CmemcacheObject*) ectxt->misc;
+            /* might be multiple errors before throwing, only collect first error */
+            if (!self->throwException)
+            {
+                snprintf(self->exceptionStr, sizeof(self->exceptionStr)-1,
+                         "%s", ectxt->errstr);
+                self->throwException = 1;
+            }
+        }
+        
+        // Try not to abort/exit. Without my patch this might segfault libmemcache.
+        ectxt->cont = 'y';
+    }
+    
+    return 0;
+}
+
 //----------------------------------------------------------------------------------------
 //
 static int
@@ -47,18 +108,22 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
     int error = 0;
     
     /* there seems to be no way to remove servers, so get rid of memcache all together */
-    cmemcache_dealloc( self );
+    if (self->mc)
+    {
+        mcm_free(self->mc_ctxt, self->mc);
+        self->mc = NULL;
+    }
     assert(self->mc == NULL);
 
     /* create new instance */
-    self->mc = mc_new();
+    self->mc = mcm_new(self->mc_ctxt);
     debug(("new mc %p\n", self->mc));
     if (self->mc == NULL)
     {
         PyErr_NoMemory();
         return -1;
     }
-    
+
     /* add servers, allow any sequence of strings */
     const int size = PySequence_Size(servers);
     int i;
@@ -101,7 +166,8 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
                     Py_BEGIN_ALLOW_THREADS;
                     for (i = 0; i < weight; ++i)
                     {
-                        debug_def(int retval =) mc_server_add4(self->mc, cserver);
+                        debug_def(int retval =)
+                            mcm_server_add4(self->mc_ctxt, self->mc, cserver);
                         debug(("retval %d\n", retval));
                     }
                     Py_END_ALLOW_THREADS;
@@ -117,7 +183,7 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
     }
     if (error)
     {
-        mc_free(self->mc);
+        mcm_free(self->mc_ctxt, self->mc);
         self->mc = NULL;
         return -1;
     }
@@ -129,13 +195,50 @@ do_set_servers(CmemcacheObject* self, PyObject* servers)
 static int
 cmemcache_init(CmemcacheObject* self, PyObject* args, PyObject* kwds)
 {
-    PyObject* servers=NULL;
+    PyObject* servers = NULL;
     char debug = 0;
 
     if (! PyArg_ParseTuple(args, "O|b", &servers, &debug))
         return -1; 
 
+    self->mc_ctxt = mcMemNewCtxt(free, malloc, malloc, realloc);
+    if (! self->mc_ctxt) {
+        return -1;
+    }
+
+    /* put back pointer in misc */
+    self->mc_ctxt->ectxt->misc = self;
+    self->mcErr = self->mc_ctxt->mcErr; /* bummer, no mcErrGetCtxt */
+    
+    /* our ectxt->misc self pointer will be reset before we use it, so keep global
+       mcErr pointer as well. */
+    if (mcErr == 0) {
+        mcErr = self->mc_ctxt->mcErr; /* bummer, no mcErrGetCtxt */
+    }
+
+    /* install our error func to adjust the ectxt to not exit() or abort(). */
+    mcErrSetupCtxt(self->mc_ctxt, errFunc);
+
+    /* Instead of using errFunc we could also just mcm_err_filter_add ERR and FATAL but
+     * then our errFunc would not be called either. */
+
+    /* mcm_err_filter_add/del broken in libmemcache-1.4.0.rc2, needs to be patched for
+       to filter info, notice and warn */
+    debug(("error filter %x\n", mcm_err_filter_get(self->mc_ctxt)));
+#ifdef NDEBUG
+    /* turn off some message/errors */
+    mcm_err_filter_add(self->mc_ctxt, MCM_ERR_LVL_INFO);
+    mcm_err_filter_add(self->mc_ctxt, MCM_ERR_LVL_NOTICE);
+    mcm_err_filter_add(self->mc_ctxt, MCM_ERR_LVL_WARN);
+#endif
+    debug(("error filter %x\n", mcm_err_filter_get(self->mc_ctxt)));
+
+    /* init self */
     self->debug = debug;
+    self->throwException = 0;
+    self->exceptionStr[0] = 0;
+
+    /* set/init the servers */
     return do_set_servers(self, servers);
 }
 
@@ -162,13 +265,18 @@ cmemcache_dealloc(CmemcacheObject* self)
 {
     debug(("cmemcache_dealloc\n"));
     
+    Py_BEGIN_ALLOW_THREADS;
     if (self->mc)
     {
-        Py_BEGIN_ALLOW_THREADS;
-        mc_free(self->mc);
-        self->mc = NULL;
-        Py_END_ALLOW_THREADS;
+        mcm_free(self->mc_ctxt, self->mc);
+        self->mc = 0;
     }
+    if (self->mc_ctxt)
+    {
+        mcMemFreeCtxt(self->mc_ctxt);
+        self->mc_ctxt = 0;
+    }
+    Py_END_ALLOW_THREADS;
 }
 
 enum StoreType
@@ -206,19 +314,24 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
     switch(storeType)
     {
         case SET:
-            retval = mc_set(self->mc, key, keylen, value, valuelen, time, flags);
+            retval = mcm_set(self->mc_ctxt,
+                             self->mc, key, keylen, value, valuelen, time, flags);
             break;
         case ADD:
-            retval = mc_add(self->mc, key, keylen, value, valuelen, time, flags);
+            retval = mcm_add(self->mc_ctxt,
+                             self->mc, key, keylen, value, valuelen, time, flags);
             break;
         case REPLACE:
-            retval = mc_replace(self->mc, key, keylen, value, valuelen, time, flags);
+            retval = mcm_replace(self->mc_ctxt,
+                                 self->mc, key, keylen, value, valuelen, time, flags);
             break;
     }
     debug(("retval = %d\n", retval));
     Py_END_ALLOW_THREADS;
-    
-    return PyInt_FromLong(retval);
+
+    // retval == 0 means success, and retval < 0 are error values.
+    // Convert to memcache convention: Nonzero on success.
+    return PyInt_FromLong(retval == 0);
 }
 
 //----------------------------------------------------------------------------------------
@@ -268,16 +381,17 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
     struct memcache_res *res;
     
     Py_BEGIN_ALLOW_THREADS;
-    req = mc_req_new();
-    res = mc_req_add(req, key, keylen);
-    mc_res_free_on_delete(res, 1);
-    mc_get(self->mc, req);
+    req = mcm_req_new(self->mc_ctxt);
+    res = mcm_req_add(self->mc_ctxt, req, key, keylen);
+    mcm_res_free_on_delete(self->mc_ctxt, res, 1);
+    mcm_get(self->mc_ctxt, self->mc, req);
     debug(("attempt %d found %d res %d '%s'\n",
-           mc_res_attempted(res), mc_res_found(res), res->size, (char*)res->val));
+           mcm_res_attempted(self->mc_ctxt, res),
+           mcm_res_found(self->mc_ctxt, res), res->size, (char*)res->val));
     Py_END_ALLOW_THREADS;
     
     PyObject* retval;
-    if (mc_res_found(res))
+    if (mcm_res_found(self->mc_ctxt, res))
     {
         if (retFlags)
         {
@@ -293,7 +407,7 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
         Py_INCREF(Py_None);
         retval = Py_None;
     }
-    mc_req_free(req);
+    mcm_req_free(self->mc_ctxt, req);
     return retval;
 }
 
@@ -331,7 +445,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
     
     struct memcache_req *req;
     struct memcache_res *res;
-    req = mc_req_new();
+    req = mcm_req_new(self->mc_ctxt);
     const int size = PySequence_Size(keys);
     int i;
     int error = 0;
@@ -345,8 +459,8 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
             if (ckey)
             {
                 debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
-                res = mc_req_add(req, ckey, PyString_Size(key));
-                mc_res_free_on_delete(res, 1);
+                res = mcm_req_add(self->mc_ctxt, req, ckey, PyString_Size(key));
+                mcm_res_free_on_delete(self->mc_ctxt, res, 1);
             }
             else
             {
@@ -370,13 +484,13 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
     else
     {
         Py_BEGIN_ALLOW_THREADS;
-        mc_get(self->mc, req);
+        mcm_get(self->mc_ctxt, self->mc, req);
         Py_END_ALLOW_THREADS;
 
         // Put all the found results in the dictionary.
         TAILQ_FOREACH(res, &req->query, entries)
         {
-            if (mc_res_found(res))
+            if (mcm_res_found(self->mc_ctxt, res))
             {
                 debug(("res found, add %s\n", res->key));
                 PyObject* key = PyString_FromStringAndSize(res->key, res->len);
@@ -385,7 +499,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
             }
         }
     }
-    mc_req_free(req);
+    mcm_req_free(self->mc_ctxt, req);
 
     return dict;
 }
@@ -412,7 +526,7 @@ cmemcache_delete(PyObject* pyself, PyObject* args)
     
     Py_BEGIN_ALLOW_THREADS;
     debug(("cmemcache_delete %s time %d\n", key, time));
-    retval = mc_delete(self->mc, key, keylen, time);
+    retval = mcm_delete(self->mc_ctxt, self->mc, key, keylen, time);
     debug(("retval = %d\n", retval));
     Py_END_ALLOW_THREADS;
     
@@ -443,16 +557,16 @@ cmemcache_incr_decr(PyObject* pyself, PyObject* args, int incr)
     debug(("cmemcache_incr_decr %s %s delta %d\n", incr ? "incr" : "decr", key, delta));
     if ( incr )
     {
-        newval = mc_incr(self->mc, key, keylen, delta);
+        newval = mcm_incr(self->mc_ctxt, self->mc, key, keylen, delta);
     }
     else
     {
-        newval = mc_decr(self->mc, key, keylen, delta);
+        newval = mcm_decr(self->mc_ctxt, self->mc, key, keylen, delta);
     }
-    debug(("newval %d errnum %d\n", newval, mc_global_ctxt()->errnum));
+    debug(("newval %d errnum %d\n", newval, self->mc_ctxt->errnum));
     Py_END_ALLOW_THREADS;
 
-    if ( mc_global_ctxt()->errnum )
+    if ( self->mc_ctxt->errnum )
     {
         Py_INCREF(Py_None);
         return Py_None;
@@ -496,7 +610,7 @@ cmemcache_get_stats(PyObject* pyself, PyObject* args)
         struct memcache_server_stats* stats;
         
         Py_BEGIN_ALLOW_THREADS;
-        stats = mc_server_stats(self->mc, ms);
+        stats = mcm_server_stats(self->mc_ctxt, self->mc, ms);
         Py_END_ALLOW_THREADS;
         
         if (stats != NULL)
@@ -549,7 +663,7 @@ cmemcache_get_stats(PyObject* pyself, PyObject* args)
             PyTuple_SetItem(tuple, 1, dict);
             PyList_Append(retval, tuple);
             
-            mc_server_stats_free(stats);
+            mcm_server_stats_free(self->mc_ctxt, stats);
         }
     }
     
@@ -568,7 +682,7 @@ cmemcache_flush_all(PyObject* pyself, PyObject* args)
     assert(self->mc);
     
     Py_BEGIN_ALLOW_THREADS;
-    debug_def(int retval =) mc_flush_all(self->mc);
+    debug_def(int retval =) mcm_flush_all(self->mc_ctxt, self->mc);
     debug(("retval = %d\n", retval));
     Py_END_ALLOW_THREADS;
     
@@ -588,7 +702,7 @@ cmemcache_disconnect_all(PyObject* pyself, PyObject* args)
     assert(self->mc);
 
     Py_BEGIN_ALLOW_THREADS;
-    mc_server_disconnect_all(self->mc);
+    mcm_server_disconnect_all(self->mc_ctxt, self->mc);
     Py_END_ALLOW_THREADS;
     
     Py_INCREF(Py_None);
@@ -769,15 +883,6 @@ init_cmemcache(void)
     PyObject* m;
 
     debug(("init_cmemcache\n"));
-    
-#ifdef NDEBUG
-    /* turn off some message/errors */
-    debug(("error filter %x\n", mc_err_filter_get()));
-    mc_err_filter_add(MCM_ERR_LVL_INFO);
-    mc_err_filter_add(MCM_ERR_LVL_NOTICE);
-    mc_err_filter_add(MCM_ERR_LVL_WARN);
-    debug(("error filter %x\n", mc_err_filter_get()));
-#endif
     
     cmemcache_CmemcacheType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&cmemcache_CmemcacheType) < 0)
