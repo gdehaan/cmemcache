@@ -116,10 +116,11 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.incr('number'), 7)
         self.failUnlessEqual(mc.decr('number'), 6)
 
-        mc.set('blo', 'bli')
-        self.failUnlessEqual(mc.get('blo'), 'bli')
+        bli = 'bli'
+        mc.set('blo', bli)
+        self.failUnlessEqual(mc.get('blo'), bli)
         d = mc.get_multi(['blo', 'number', 'doesnotexist'])
-        self.failUnlessEqual(d, {'blo':'bli', 'number':'6'})
+        self.failUnlessEqual(d, {'blo':bli, 'number':'6'})
 
         # make sure zero delimitation characters are ignored in values.
         test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
@@ -218,7 +219,12 @@ class TestCmemcache( unittest.TestCase ):
             mc = memcache.Client(self.servers)
             self._test_base(memcache, mc, ok=1)
             self._test_client(memcache, ok=1)
-        
+
+        # print out extension just to make sure we got the local one (and not some
+        # installed version somewhere)
+        import _cmemcache
+        print _cmemcache
+
         # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)

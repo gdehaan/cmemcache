@@ -111,6 +111,10 @@ Changes
 
 Versions:
 
+0.93
+  Fixed memory leak caused by not Py_DECREF of key and val objects when callin
+  PyDict_SetItem(). Reported and fixed by Alfred J Fazio.
+
 0.92
   Changed return values for set, add, and replace to be the same as memcache.py, ie
   nonzero on success. Reported by Marek Majkowski.

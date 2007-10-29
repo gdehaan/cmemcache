@@ -33,7 +33,7 @@ typedef struct
 
 /*** Forward Declarations ***/
 
-static void
+static void 
 cmemcache_dealloc(CmemcacheObject* self);
 
 static mcErrFunc mcErr = 0;
@@ -486,7 +486,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
         Py_BEGIN_ALLOW_THREADS;
         mcm_get(self->mc_ctxt, self->mc, req);
         Py_END_ALLOW_THREADS;
-
+        
         // Put all the found results in the dictionary.
         TAILQ_FOREACH(res, &req->query, entries)
         {
@@ -496,6 +496,8 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
                 PyObject* key = PyString_FromStringAndSize(res->key, res->len);
                 PyObject* val = PyString_FromStringAndSize(res->val, res->size);
                 PyDict_SetItem(dict, key, val);
+                Py_DECREF(key);
+                Py_DECREF(val);
             }
         }
     }
@@ -620,9 +622,14 @@ cmemcache_get_stats(PyObject* pyself, PyObject* args)
             PyObject* name = PyString_FromString(buffer);
             PyObject* dict = PyDict_New();
 
+            PyObject* valobj;
+            
 #define SET_SNPRINTF(d, key, fmt, val)           \
-            snprintf(buffer, 128, fmt, val);   \
-            PyDict_SetItem(d, PyString_FromString(key), PyString_FromString(buffer))
+            snprintf(buffer, 128, fmt, val);     \
+            valobj = PyString_FromString(buffer); \
+            PyDict_SetItemString(d, key, valobj); \
+            Py_DECREF(valobj);                    \
+            valobj = NULL
             
 #define SET_TIME(d, key, val) SET_SNPRINTF(d, key, "%ld", val)
 #define SET_ITEMU32(d, key, val) SET_SNPRINTF(d, key, "%u", val)
