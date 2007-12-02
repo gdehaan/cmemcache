@@ -111,9 +111,18 @@ Changes
 
 Versions:
 
+0.94
+  Fixed get_multi() return values for Client. All results would be returned as 
+  strings, instead of the proper types. Reported and fixed by Alfred J Fazio.
+
 0.93
-  Fixed memory leak caused by not Py_DECREF of key and val objects when callin
+  Fixed memory leak caused by not Py_DECREF of key and val objects when calling
   PyDict_SetItem(). Reported and fixed by Alfred J Fazio.
+  Allocated my own context and moved from mc_ api to mcm_ api to use. Install my
+  own error handler to change the cont state of the memcache_err_ctxt object to
+  'y' to try not to abort on fatal errors. This was an attempt to not crash python on 
+  fatal errors from libmemcache, but libmemcache needs considerable changes to make it
+  work.
 
 0.92
   Changed return values for set, add, and replace to be the same as memcache.py, ie

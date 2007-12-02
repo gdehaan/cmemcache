@@ -154,3 +154,5 @@ class Client(StringClient):
 
         return val
         
+    def get_multi(self, keys):
+        return StringClient.get_multiflags(self, keys)
