@@ -7,6 +7,13 @@
 #include <Python.h>
 #include "memcache.h"
 
+#define _FLAG_PICKLE  1<<0
+#define _FLAG_INTEGER 1<<1
+#define _FLAG_LONG    1<<2
+
+PyObject* picklemodule=NULL;
+PyObject* loads=NULL;
+
 /*** Types ***/
 
 typedef struct 
@@ -509,6 +516,100 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
 //----------------------------------------------------------------------------------------
 //
 static PyObject*
+cmemcache_get_multiflags(PyObject* pyself, PyObject* args)
+{
+    CmemcacheObject* self = (CmemcacheObject*)pyself;
+    
+    debug(("cmemcache_get_multiflags\n"));
+
+    assert(self->mc);
+    
+    PyObject* keys = NULL;
+
+    if (! PyArg_ParseTuple(args, "O", &keys))
+        return NULL;
+    
+    struct memcache_req *req;
+    struct memcache_res *res;
+    req = mc_req_new();
+    const int size = PySequence_Size(keys);
+    int i;
+    int error = 0;
+    for (i = 0; i < size && error == 0; ++i)
+    {
+        PyObject* key = NULL;
+        key = PySequence_GetItem(keys, i);
+        if (PyString_Check(key))
+        {
+            char* ckey = PyString_AsString(key);
+            if (ckey)
+            {
+                debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
+                res = mc_req_add(req, ckey, PyString_Size(key));
+                mc_res_free_on_delete(res, 1);
+            }
+            else
+            {
+                PyErr_BadArgument();
+                error = 1;
+            }
+        }
+        else
+        {
+            debug(("not a string\n"));
+            PyErr_BadArgument();
+            error = 1;
+        }
+        Py_DECREF(key);
+    }
+    PyObject* dict = PyDict_New();
+    if (error)
+    {
+        debug(("error\n"));
+    }
+    else
+    {
+        Py_BEGIN_ALLOW_THREADS;
+        mc_get(self->mc, req);
+        Py_END_ALLOW_THREADS;
+
+        // Put all the found results in the dictionary.
+        TAILQ_FOREACH(res, &req->query, entries)
+        {
+            if (mc_res_found(res))
+            {
+	        debug(("res found, add %s\n", res->key));
+		PyObject* key = PyString_FromStringAndSize(res->key, res->len);
+		PyObject* val = PyString_FromStringAndSize(res->val, res->size);
+		char * s;
+		if ((int)res->flags & _FLAG_INTEGER) {
+                    s = PyString_AsString(val);
+                    val = PyInt_FromString(s, NULL, 0);
+                }
+                else if ((int)res->flags & _FLAG_LONG) {
+                    s = PyString_AsString(val);
+                    val = PyLong_FromString(s, NULL, 0);
+                }
+                else if ((int)res->flags & _FLAG_PICKLE) {
+                    PyObject *tuple=PyTuple_New(1);
+                    PyTuple_SetItem(tuple, 0, val);
+                    val = PyObject_CallObject(loads, tuple);
+                }
+
+                PyDict_SetItem(dict, key, val);
+                Py_DECREF(key);
+                Py_DECREF(val);
+            }
+        }
+    }
+    mcm_req_free(self->mc_ctxt, req);
+
+    return dict;
+}
+
+//----------------------------------------------------------------------------------------
+//
+static PyObject*
 cmemcache_delete(PyObject* pyself, PyObject* args)
 {
     CmemcacheObject* self = (CmemcacheObject*)pyself;
@@ -770,6 +871,23 @@ static PyMethodDef cmemcache_methods[] = {
     },
     
     {
+        "get_multiflags", cmemcache_get_multiflags, METH_VARARGS,
+        "get_multiflags(keys) --\n"
+        "Retrieves multiple keys from the memcache doing just one query.\n"
+        ">>> success = mc.set(\"foo\", \"bar\")\n"
+        ">>> success = mc.set(\"baz\", 42)\n"
+        ">>> mc.get_multi([\"foo\", \"baz\", \"foobar\"]) == {\"foo\": \"bar\", \"baz\": 42}\n"
+        "\n"
+        "This method is recommended over regular L{get} as it lowers the number of\n"
+        "total packets flying around your network, reducing total latency, since\n"
+        "your app doesn't have to wait for each round-trip of L{get} before sending\n"
+        "the next one.\n"
+        "\n"
+        "@param keys: An array of keys.\n"
+        "@return:  A dictionary of key/value pairs that were available.\n"
+    },
+    
+    {
         "delete", cmemcache_delete, METH_VARARGS,
         "delete(key, time=0) -- Deletes a key from the memcache.\n\n"
         "@return: Nonzero on success.\n@rtype: int"
@@ -897,6 +1015,19 @@ init_cmemcache(void)
 
     m = Py_InitModule3("_cmemcache", cmemcache_module_methods,
                        "Extension to memcached using libmemcache.");
+
+    picklemodule = PyImport_ImportModule("cPickle");
+    if (!picklemodule) {
+        PyErr_Clear();
+        picklemodule = PyImport_ImportModule("pickle");
+        if (!picklemodule)
+            PyErr_Clear();
+    }
+    if (picklemodule) {
+        loads = PyObject_GetAttrString(picklemodule, "loads");
+        if (!loads)
+            PyErr_Clear();
+    }
 
     Py_INCREF(&cmemcache_CmemcacheType);
     PyModule_AddObject(m, "StringClient", (PyObject *)&cmemcache_CmemcacheType);
