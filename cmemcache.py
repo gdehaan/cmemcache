@@ -50,6 +50,7 @@ More detailed documentation is available in the L{Client} and L{StringClient} cl
 __version__ = "$Revision$"
 __author__ = "$Author$"
 
+import traceback
 import types
 try:
     import cPickle as pickle
@@ -171,7 +172,7 @@ class Client(StringClient):
                 try:
                     val = pickle.loads(buf)
                 except:
-                    self.debuglog('Pickle error...\n')
+                    self.debuglog('Pickle error...\n%s' % traceback.format_exc())
                     val = None
             else:
                 self.debuglog("unknown flags on get: %x\n" % flags)
