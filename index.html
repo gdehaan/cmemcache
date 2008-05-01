@@ -113,7 +113,7 @@ not sure which is required)</li>
 <h1><a class="toc-backref" href="#id8" id="known-bugs" name="known-bugs">Known Bugs</a></h1>
 <p>cmemcache:</p>
 <ul class="simple">
-<li>Aborting errors are not converted into python exceptions.</li>
+<li>Aborting libmemcache errors are not converted into python exceptions.</li>
 </ul>
 <p>libmemcache:</p>
 <ul>
@@ -144,6 +144,24 @@ python exception. However, I do not know if libmemcache will recover correctly.<
 <h1><a class="toc-backref" href="#id9" id="changes" name="changes">Changes</a></h1>
 <p>Versions:</p>
 <dl class="docutils">
+<dt>0.94</dt>
+<dd><p class="first">Fixed get_multi() return values for Client. All results would be returned as
+strings, instead of the proper types. Reported and fixed by Alfred J Fazio.</p>
+<p class="last">cmemcache.py uses debuglog() (memcache.py remnant) but debuglog() is not even defined,
+doh! Reported by Simon Law. His patch uses python module logging, but to avoid
+dependencies I added the same stderr logger as used in memcache.py. One can override
+the cmemcache.log variable to install another log function.</p>
+</dd>
+<dt>0.93</dt>
+<dd><p class="first">Fixed memory leak caused by not Py_DECREF of key and val objects when calling
+PyDict_SetItem(). Reported and fixed by Alfred J Fazio.</p>
+<p class="last">Allocated my own context and moved from 'mc_*' api to 'mcm_*' api to use. Install error
+handler to change the 'cont' state of the memcache_err_ctxt object to 'y' to try not to
+abort on fatal errors. This is an attempt to not crash python on fatal errors from
+libmemcache, but libmemcache needs considerable changes to make it work. I am not too
+sure about my libmemcache so I have not released them yet. Code is compatible with
+libmemcache-1.4.0 though.</p>
+</dd>
 <dt>0.92</dt>
 <dd>Changed return values for set, add, and replace to be the same as memcache.py, ie
 nonzero on success. Reported by Marek Majkowski.</dd>

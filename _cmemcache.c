@@ -205,11 +205,11 @@ cmemcache_init(CmemcacheObject* self, PyObject* args, PyObject* kwds)
     PyObject* servers = NULL;
     char debug = 0;
 
-    if (! PyArg_ParseTuple(args, "O|b", &servers, &debug))
+    if (!PyArg_ParseTuple(args, "O|b", &servers, &debug))
         return -1; 
 
     self->mc_ctxt = mcMemNewCtxt(free, malloc, malloc, realloc);
-    if (! self->mc_ctxt) {
+    if (!self->mc_ctxt) {
         return -1;
     }
 
@@ -242,7 +242,7 @@ cmemcache_init(CmemcacheObject* self, PyObject* args, PyObject* kwds)
 
     /* init self */
     self->debug = debug;
-    self->throwException = 0;
+    self->throwException = 0; // FIXME: not used yet, better to fix libmemcache to retry
     self->exceptionStr[0] = 0;
 
     /* set/init the servers */

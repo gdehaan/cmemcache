@@ -173,7 +173,8 @@ class TestCmemcache( unittest.TestCase ):
         Test Client, only need to test the set, get, add, replace, rest is
         implemented by test_memcache().
         """
-        mc = mcm.Client(self.servers)
+        mc = mcm.Client(self.servers, debug=True)
+        mc.debuglog("This should be in the output (test.py)")
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
 
@@ -187,7 +188,7 @@ class TestCmemcache( unittest.TestCase ):
         Test mc when there is no memcached running (anymore).
         """
 
-        # No memcached so should get no value
+        # memcached not running, so get should return no value
         self.failUnlessEqual(mc.get('bla'), None)
         self.failUnlessEqual(mc.set('bla', 'bli'), 0)
 
@@ -208,7 +209,7 @@ class TestCmemcache( unittest.TestCase ):
             time.sleep(0.5)
         s.close()
 
-        # use memcache as the reference
+        # Apply tests to memcache as the reference
         mc = None
         try:
             import memcache
@@ -236,8 +237,11 @@ class TestCmemcache( unittest.TestCase ):
         # if we created memcached for our test, then shut it down
         if memcached:
             os.kill(memcached.pid, signal.SIGINT)
+
+            # test get() with memcached not running anymore
+            if mc:
+                self._test_no_memcached(mc)
             self._test_no_memcached(cmc)
-            self._test_no_memcached(mc)
 
 if __name__ == '__main__':
     unittest.main()
