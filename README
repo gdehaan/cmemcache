@@ -78,7 +78,7 @@ Known Bugs
 
 cmemcache:
 
-- Aborting errors are not converted into python exceptions.
+- Aborting libmemcache errors are not converted into python exceptions.
 
 libmemcache:
 
@@ -115,14 +115,21 @@ Versions:
   Fixed get_multi() return values for Client. All results would be returned as 
   strings, instead of the proper types. Reported and fixed by Alfred J Fazio.
 
+  cmemcache.py uses debuglog() (memcache.py remnant) but debuglog() is not even defined,
+  doh! Reported by Simon Law. His patch uses python module logging, but to avoid
+  dependencies I added the same stderr logger as used in memcache.py. One can override
+  the cmemcache.log variable to install another log function.
+
 0.93
   Fixed memory leak caused by not Py_DECREF of key and val objects when calling
   PyDict_SetItem(). Reported and fixed by Alfred J Fazio.
-  Allocated my own context and moved from mc_ api to mcm_ api to use. Install my
-  own error handler to change the cont state of the memcache_err_ctxt object to
-  'y' to try not to abort on fatal errors. This was an attempt to not crash python on 
-  fatal errors from libmemcache, but libmemcache needs considerable changes to make it
-  work.
+
+  Allocated my own context and moved from 'mc_*' api to 'mcm_*' api to use. Install error
+  handler to change the 'cont' state of the memcache_err_ctxt object to 'y' to try not to
+  abort on fatal errors. This is an attempt to not crash python on fatal errors from
+  libmemcache, but libmemcache needs considerable changes to make it work. I am not too
+  sure about my libmemcache so I have not released them yet. Code is compatible with
+  libmemcache-1.4.0 though.
 
 0.92
   Changed return values for set, add, and replace to be the same as memcache.py, ie

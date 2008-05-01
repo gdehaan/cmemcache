@@ -60,6 +60,19 @@ from _cmemcache import StringClient
 
 #-----------------------------------------------------------------------------------------
 #
+def stderrlog(str):
+    """
+    Log to stderr.
+    """
+    import sys
+    sys.stderr.write("MemCached: %s\n" % str)
+
+# Override with your own function to integrate with some other logging mechanism
+# To get any output one must create a Client(..., debug=1)
+log = stderrlog
+
+#-----------------------------------------------------------------------------------------
+#
 class Client(StringClient):
     """
     Use memcached flags parameter to set/add/replace to handle any python class as
@@ -70,6 +83,17 @@ class Client(StringClient):
     _FLAG_INTEGER = 1<<1
     _FLAG_LONG    = 1<<2
 
+    def __init__(self, servers, debug=0):
+        """
+        Create a new Client object with the given list of servers.
+
+        @param servers: C{servers} is passed to L{set_servers}.
+        @param debug: whether to display error messages when a server can't be
+        contacted. (A lot less verbose than memcache.py).
+        """
+        StringClient.__init__(self, servers)
+        self.debug = debug
+    
     def _convert(self, val):
         """
         Convert val to str, flags tuple.
@@ -156,3 +180,8 @@ class Client(StringClient):
         
     def get_multi(self, keys):
         return StringClient.get_multiflags(self, keys)
+
+    def debuglog(self, str):
+        if self.debug:
+            log(str)
+
