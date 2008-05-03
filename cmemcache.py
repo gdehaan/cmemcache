@@ -157,7 +157,7 @@ class Client(StringClient):
         """
         Retrieves a key from the memcache.
         
-        @return: The value or None if key doesn't exist.
+        @return: The value or None if key doesn't exist (or if there are decoding errors).
         """
         val = StringClient.getflags(self, key)
         if val:
@@ -176,6 +176,7 @@ class Client(StringClient):
                     val = None
             else:
                 self.debuglog("unknown flags on get: %x\n" % flags)
+                val = None
 
         return val
         

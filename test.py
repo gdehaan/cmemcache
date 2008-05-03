@@ -11,7 +11,7 @@ Test for cmemcache module.
 __version__ = "$Revision$"
 __author__ = "$Author$"
 
-import os, signal, socket, subprocess, unittest
+import os, signal, socket, subprocess, unittest, time
 
 #-----------------------------------------------------------------------------------------
 #
@@ -182,6 +182,26 @@ class TestCmemcache( unittest.TestCase ):
         repval = {'bla':'blo', 'blo':12}
         norepval = {'blo':12}
         self._test_sgra(mc, val, repval, norepval, ok)
+
+        mc.set('number', 124567)
+        self.failUnlessEqual(mc.get('number'), 124567)
+        mc.set('longnumber', 123456789L)
+        self.failUnlessEqual(mc.get('longnumber'), 123456789L)
+
+        bli = ['bli']
+        mc.set('blo', bli)
+        self.failUnlessEqual(mc.get('blo'), bli)
+        d = mc.get_multi(['blo', 'number', 'doesnotexist', 'longnumber'])
+        self.failUnlessEqual(d, {'blo':bli, 'number':124567, 'longnumber':123456789L})
+
+        # some quick timing.
+        t0 = time.time()
+        n = 10000
+        for i in xrange(n):
+            d = mc.get_multi(['blo', 'number', 'doesnotexist', 'longnumber'])
+            self.failUnlessEqual(d, {'blo':bli, 'number':124567, 'longnumber':123456789L})
+        t1 = time.time()
+        print 'time elapsed', t1-t0, 'for', n, 'get_multi'
 
     def _test_no_memcached(self, mc):
         """

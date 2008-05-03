@@ -578,27 +578,36 @@ cmemcache_get_multiflags(PyObject* pyself, PyObject* args)
         {
             if (mc_res_found(res))
             {
-	        debug(("res found, add %s\n", res->key));
+	        debug(("res found, add %s %s f %d\n",
+                       res->key, (char*)res->val, res->flags));
 		PyObject* key = PyString_FromStringAndSize(res->key, res->len);
-		PyObject* val = PyString_FromStringAndSize(res->val, res->size);
-		char * s;
-		if ((int)res->flags & _FLAG_INTEGER) {
-                    s = PyString_AsString(val);
-                    val = PyInt_FromString(s, NULL, 0);
+		PyObject* val = NULL;
+                int flags = (int)res->flags;
+                if (flags == 0) {
+                    // Return the string.
+                    val = PyString_FromStringAndSize(res->val, res->size);
                 }
-                else if ((int)res->flags & _FLAG_LONG) {
-                    s = PyString_AsString(val);
-                    val = PyLong_FromString(s, NULL, 0);
+                else if (flags & _FLAG_INTEGER) {
+                    val = PyInt_FromString(res->val, res->val + res->size - 1, 0);
                 }
-                else if ((int)res->flags & _FLAG_PICKLE) {
-                    PyObject *tuple=PyTuple_New(1);
-                    PyTuple_SetItem(tuple, 0, val);
+                else if (flags & _FLAG_LONG) {
+                    val = PyLong_FromString(res->val, res->val + res->size - 1, 0);
+                }
+                else if (flags & _FLAG_PICKLE) {
+                    // Create the string, put it in a tuple to pass as parameters to
+                    // unpickle
+                    val = PyString_FromStringAndSize(res->val, res->size);
+                    PyObject *tuple = PyTuple_New(1);
+                    PyTuple_SetItem(tuple, 0, val); // steals val reference
                     val = PyObject_CallObject(loads, tuple);
+                    Py_DECREF(tuple);
                 }
 
-                PyDict_SetItem(dict, key, val);
+                if (val) {
+                    PyDict_SetItem(dict, key, val);
+                    Py_DECREF(val);
+                }
                 Py_DECREF(key);
-                Py_DECREF(val);
             }
         }
     }
