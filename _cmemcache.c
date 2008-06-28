@@ -47,6 +47,15 @@ static mcErrFunc mcErr = 0;
 
 //----------------------------------------------------------------------------------------
 //
+static time_t expParamToExpTime(long int expParam)
+{
+    // Clamp expire time to valid range, memcached docs say the value is a 32 bit integer,
+    // and negative is not valid. And libmemcache only handles 32 bit ints.
+    return expParam < 0 ? 0 : expParam > 0x7FFFFFFF ? 0x7FFFFFFF : expParam;
+}
+
+//----------------------------------------------------------------------------------------
+//
 static int32_t errFunc(MCM_ERR_FUNC_ARGS)
 {
     const struct memcache_ctxt *ctxt;
@@ -303,34 +312,37 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
     assert(self->mc);
     
     char* key = NULL;
-    int keylen = 0;
+    size_t keylen = 0;
     const char* value = NULL;
-    int valuelen = 0;
-    int time = 0;
+    size_t valuelen = 0;
+    time_t expTime;
+    long int expParam = 0;
     int flags = 0;
     
-    if (! PyArg_ParseTuple(args, "s#s#|ii",
-                           &key, &keylen, &value, &valuelen, &time, &flags))
+    if (! PyArg_ParseTuple(args, "s#s#|li",
+                           &key, &keylen, &value, &valuelen, &expParam, &flags))
         return NULL;
+
+    expTime = expParamToExpTime(expParam);
     
     int retval = 0;
     
     Py_BEGIN_ALLOW_THREADS;
-    debug(("cmemcache_store %d %s '%s' time %d flags %d\n",
-           storeType, key, value, time, flags));
+    debug(("cmemcache_store %d %s '%s' time %ld flags %d\n",
+           storeType, key, value, expTime, flags));
     switch(storeType)
     {
         case SET:
             retval = mcm_set(self->mc_ctxt,
-                             self->mc, key, keylen, value, valuelen, time, flags);
+                             self->mc, key, keylen, value, valuelen, expTime, flags);
             break;
         case ADD:
             retval = mcm_add(self->mc_ctxt,
-                             self->mc, key, keylen, value, valuelen, time, flags);
+                             self->mc, key, keylen, value, valuelen, expTime, flags);
             break;
         case REPLACE:
             retval = mcm_replace(self->mc_ctxt,
-                                 self->mc, key, keylen, value, valuelen, time, flags);
+                                 self->mc, key, keylen, value, valuelen, expTime, flags);
             break;
     }
     debug(("retval = %d\n", retval));
@@ -375,7 +387,7 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
     assert(self->mc);
     
     char* key = NULL;
-    int keylen = 0;
+    size_t keylen = 0;
 
     if (! PyArg_ParseTuple(args, "s#", &key, &keylen))
     {
@@ -628,17 +640,20 @@ cmemcache_delete(PyObject* pyself, PyObject* args)
     assert(self->mc);
     
     char* key = NULL;
-    int keylen = 0;
-    int time = 0;
+    size_t keylen = 0;
+    time_t expTime;
+    long int expParam = 0;
 
-    if (! PyArg_ParseTuple(args, "s#|i", &key, &keylen, &time))
+    if (! PyArg_ParseTuple(args, "s#|l", &key, &keylen, &expParam))
         return NULL;
+
+    expTime = expParamToExpTime(expParam);
 
     int retval;
     
     Py_BEGIN_ALLOW_THREADS;
-    debug(("cmemcache_delete %s time %d\n", key, time));
-    retval = mcm_delete(self->mc_ctxt, self->mc, key, keylen, time);
+    debug(("cmemcache_delete %s expTime %ld\n", key, expTime));
+    retval = mcm_delete(self->mc_ctxt, self->mc, key, keylen, expTime);
     debug(("retval = %d\n", retval));
     Py_END_ALLOW_THREADS;
     
@@ -657,7 +672,7 @@ cmemcache_incr_decr(PyObject* pyself, PyObject* args, int incr)
     assert(self->mc);
     
     char* key = NULL;
-    int keylen = 0;
+    size_t keylen = 0;
     int delta = 1;
 
     if (! PyArg_ParseTuple(args, "s#|i", &key, &keylen, &delta))
