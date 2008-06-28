@@ -11,7 +11,7 @@ Test for cmemcache module.
 __version__ = "$Revision$"
 __author__ = "$Author$"
 
-import os, signal, socket, subprocess, unittest, time
+import os, signal, socket, subprocess, unittest, time, sys
 
 #-----------------------------------------------------------------------------------------
 #
@@ -117,7 +117,9 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.decr('number'), 6)
 
         bli = 'bli'
-        mc.set('blo', bli)
+        # try with maxint
+        exptime = sys.maxint
+        mc.set('blo', bli, exptime)
         self.failUnlessEqual(mc.get('blo'), bli)
         d = mc.get_multi(['blo', 'number', 'doesnotexist'])
         self.failUnlessEqual(d, {'blo':bli, 'number':'6'})
