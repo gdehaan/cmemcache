@@ -111,6 +111,13 @@ Changes
 
 Versions:
 
+0.95
+
+  Fixed expire time internal type (was int, must be time_t). To be on the save side the
+  expire time is also clamped to 2**31-1 to follow the memcache protocol spec. Old code
+  caused problems when using sys.maxint on 64-bit machines. Reported and patched by Simon
+  Law.
+
 0.94
   Added missing debuglog() implementation, copy/paste error from memcache.py. get() now
   returns None on all error cases. Reported by Simon Law.

@@ -312,9 +312,9 @@ cmemcache_store(PyObject* pyself, PyObject* args, enum StoreType storeType)
     assert(self->mc);
     
     char* key = NULL;
-    size_t keylen = 0;
+    int keylen = 0;
     const char* value = NULL;
-    size_t valuelen = 0;
+    int valuelen = 0;
     time_t expTime;
     long int expParam = 0;
     int flags = 0;
@@ -387,7 +387,7 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
     assert(self->mc);
     
     char* key = NULL;
-    size_t keylen = 0;
+    int keylen = 0;
 
     if (! PyArg_ParseTuple(args, "s#", &key, &keylen))
     {
@@ -640,7 +640,7 @@ cmemcache_delete(PyObject* pyself, PyObject* args)
     assert(self->mc);
     
     char* key = NULL;
-    size_t keylen = 0;
+    int keylen = 0;
     time_t expTime;
     long int expParam = 0;
 
@@ -672,7 +672,7 @@ cmemcache_incr_decr(PyObject* pyself, PyObject* args, int incr)
     assert(self->mc);
     
     char* key = NULL;
-    size_t keylen = 0;
+    int keylen = 0;
     int delta = 1;
 
     if (! PyArg_ParseTuple(args, "s#|i", &key, &keylen, &delta))
