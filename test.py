@@ -69,11 +69,11 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessRaises(ValueError, lambda: mc.decr('nonexistantnumber'))
         self.failUnlessRaises(ValueError, lambda: mc.incr('nonexistantnumber'))
         
-    def _test_sgra(self, mc, val, repval, norepval, ok):
+    def _test_sgra(self, mc, val, repval, norepval):
         """
         Test set, get, replace, add api.
         """
-        self.failUnlessEqual(mc.set('blo', val), ok)
+        self.failUnlessEqual(mc.set('blo', val), 1)
         self.failUnlessEqual(mc.get('blo'), val)
         mc.replace('blo', repval)
         self.failUnlessEqual(mc.get('blo'), repval)
@@ -87,7 +87,7 @@ class TestCmemcache( unittest.TestCase ):
         mc.add('blo', repval)
         self.failUnlessEqual(mc.get('blo'), repval)
 
-    def _test_base(self, mcm, mc, ok):
+    def _test_base(self, mcm, mc):
         """
         The base test, uses string values only.
 
@@ -103,7 +103,7 @@ class TestCmemcache( unittest.TestCase ):
 
         print 'testing', mc, 'version', mcm.__version__, '\n\tfrom', mcm
 
-        self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
+        self._test_sgra(mc, 'blu', 'replace', 'will not be set')
 
         mc.delete('blo')
         self.failUnlessEqual(mc.get('blo'), None)
@@ -170,7 +170,7 @@ class TestCmemcache( unittest.TestCase ):
 
         mc.disconnect_all()
 
-    def _test_client(self, mcm, ok):
+    def _test_client(self, mcm):
         """
         Test Client, only need to test the set, get, add, replace, rest is
         implemented by test_memcache().
@@ -178,12 +178,12 @@ class TestCmemcache( unittest.TestCase ):
         mc = mcm.Client(self.servers, debug=True)
         mc.debuglog("This should be in the output (test.py)")
 
-        self._test_sgra(mc, 'blu', 'replace', 'will not be set', ok)
+        self._test_sgra(mc, 'blu', 'replace', 'will not be set')
 
         val = {'bla':'bli', 'blo':12}
         repval = {'bla':'blo', 'blo':12}
         norepval = {'blo':12}
-        self._test_sgra(mc, val, repval, norepval, ok)
+        self._test_sgra(mc, val, repval, norepval)
 
         mc.set('number', 124567)
         self.failUnlessEqual(mc.get('number'), 124567)
@@ -240,8 +240,8 @@ class TestCmemcache( unittest.TestCase ):
         else:
             self._test_memcache(memcache)
             mc = memcache.Client(self.servers)
-            self._test_base(memcache, mc, ok=1)
-            self._test_client(memcache, ok=1)
+            self._test_base(memcache, mc)
+            self._test_client(memcache)
 
         # print out extension just to make sure we got the local one (and not some
         # installed version somewhere)
@@ -251,10 +251,10 @@ class TestCmemcache( unittest.TestCase ):
         # test extension
         import cmemcache
         self._test_cmemcache(cmemcache)
-        self._test_base(cmemcache, cmemcache.StringClient(self.servers), ok=1)
+        self._test_base(cmemcache, cmemcache.StringClient(self.servers))
         cmc = cmemcache.Client(self.servers)
-        self._test_base(cmemcache, cmc, ok=1)
-        self._test_client(cmemcache, ok=1)
+        self._test_base(cmemcache, cmc)
+        self._test_client(cmemcache)
 
         # if we created memcached for our test, then shut it down
         if memcached:

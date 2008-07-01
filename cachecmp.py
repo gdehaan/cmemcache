@@ -17,7 +17,7 @@ __author__ = "$Author$"
 
 #-----------------------------------------------------------------------------------------
 #
-def createv( n, i, size=1 ):
+def createv(n, i, size=1):
     """
     Create string value from base 'n' and integer 'i'. Size can be used to make it bigger.
     """
@@ -30,14 +30,14 @@ class store(object):
     Store base class.
     """
 
-    def copy( self ):
+    def copy(self):
         """
         Create a copy of the store for multi-thread usage. Default assumes store is
         thread safe and returns self.
         """
         return self
 
-    def teardown( self, nv ):
+    def teardown(self, nv):
         """
         Tear down the store, ie remove added keys, etc.
         """
@@ -51,13 +51,19 @@ class nativestore(store):
 
     name = 'native'
 
-    def setup( self, nv ):
+    def setup(self, nv):
         self.nv = nv.copy()
 
-    def get( self, name ):
+    def get(self, name):
         return self.nv[name]
 
-    def set( self, name, value ):
+    def get_multi(self, names):
+        r = {}
+        for n in names:
+            r[n] = self.nv[n]
+        return r
+
+    def set(self, name, value):
         self.nv[name] = value
 
 #-----------------------------------------------------------------------------------------
@@ -69,13 +75,19 @@ class nativestorecopy(store):
 
     name = 'nativecopy'
 
-    def setup( self, nv ):
+    def setup(self, nv):
         self.nv = nv.copy()
 
-    def get( self, name ):
+    def get(self, name):
         return self.nv[name][:]
 
-    def set( self, name, value ):
+    def get_multi(self, names):
+        r = {}
+        for n in names:
+            r[n] = self.nv[n][:]
+        return r
+
+    def set(self, name, value):
         self.nv[name] = value[:]
 
 #-----------------------------------------------------------------------------------------
@@ -88,7 +100,7 @@ class sqlstor(store):
     name = 'sql'
     table_name = "cachetest"
 
-    def setupDB( self ):
+    def setupDB(self):
         import psycopg2
         self.dbapi = psycopg2
         self.conn = psycopg2.connect(database='test',
@@ -105,7 +117,7 @@ class sqlstor(store):
                 }
         self.NameValueTable = NameValueTable
 
-    def setup( self, nv ):
+    def setup(self, nv):
         self.setupDB()
         curs = self.conn.cursor()
         try:
@@ -126,12 +138,12 @@ class sqlstor(store):
 
         self.conn.commit()
 
-    def get( self, name ):
+    def get(self, name):
         res = self.NameValueTable.select('WHERE name = %s', (name,), cols=('value',))
         assert(len(res) == 1)
         return res.next().value
 
-    def set( self, name, value ):
+    def set(self, name, value):
         self.NameValueTable.update('WHERE name=%s', (name,), value=value)
 
 #-----------------------------------------------------------------------------------------
@@ -143,27 +155,30 @@ class memcachedstor(store):
 
     name = 'memcached'
 
-    def __init__( self ):
+    def __init__(self):
         import memcache
         servers = ["127.0.0.1:11211"]
         self.mc = memcache.Client(servers, debug=0)
         self.mc.flush_all()
 
-    def setup( self, nv ):
+    def setup(self, nv):
         for n, v in nv.iteritems():
             self.mc.set(n, v)
 
-    def teardown( self, nv ):
+    def teardown(self, nv):
         for n in nv.iterkeys():
             self.mc.delete(n)
 
-    def get( self, name ):
+    def get(self, name):
         return self.mc.get(name)
 
-    def set( self, name, value ):
+    def get_multi(self, names):
+        return self.mc.get_multi(names)
+
+    def set(self, name, value):
         return self.mc.set(name, value)
 
-    def copy( self ):
+    def copy(self):
         """
         memcache object not thread safe, return a new one for each thread.
         """
@@ -179,23 +194,26 @@ class cmemcachedstor(store):
 
     name = 'cmemcached'
 
-    def __init__( self ):
+    def __init__(self):
         import cmemcache
         servers = ["127.0.0.1:11211"]
         self.mc = cmemcache.Client(servers, debug=0)
         # fixme: self.mc.flush_all()
 
-    def setup( self, nv ):
+    def setup(self, nv):
         for n, v in nv.iteritems():
             self.mc.set(n, v)
 
-    def get( self, name ):
+    def get(self, name):
         return self.mc.get(name)
 
-    def set( self, name, value ):
+    def get_multi(self, names):
+        return self.mc.get_multi(names)
+
+    def set(self, name, value):
         return self.mc.set(name, value)
 
-    def copy( self ):
+    def copy(self):
         """
         memcache object not thread safe, return a new one for each thread.
         """
@@ -211,12 +229,12 @@ class poshstor(store):
 
     name = 'posh'
     
-    def setup( self, nv ):
+    def setup(self, nv):
         import posh
         self.nv = nv.copy()
         self.snv = posh.share(self.nv)
 
-    def get( self, name ):
+    def get(self, name):
         return self.snv[name]
 
 #-----------------------------------------------------------------------------------------
@@ -225,7 +243,7 @@ class test(object):
     """
     Test base class.
     """
-    def __init__( self, opts ):
+    def __init__(self, opts):
         self.opts = opts
 
 #-----------------------------------------------------------------------------------------
@@ -237,7 +255,7 @@ class seqtest(test):
 
     name = 'seq'
 
-    def run( self, store, nv ):
+    def run(self, store, nv):
         for n,v in nv.iteritems():
             value = store.get(n)
             if value != v:
@@ -253,7 +271,7 @@ class seqnotesttest(test):
 
     name = 'seqnotest'
 
-    def run( self, store, nv ):
+    def run(self, store, nv):
         get = store.get
         for n in nv.iterkeys():
             get(n)
@@ -267,7 +285,7 @@ class seqrndwrttest(test):
 
     name = 'seqrndwrt'
 
-    def run( self, store, nv ):
+    def run(self, store, nv):
         for n,v in nv.iteritems():
             if random.random() < opts.writeratio:
                 # just set same value, I don't think that is being optimised in the store
@@ -287,15 +305,48 @@ class rndtest(test):
 
     name = 'rnd'
 
-    def run( self, store, nv ):
+    def __init__(self, opts, nv, dummy):
+        test.__init__(self, opts)
+
+        # make it a sequence, faster
+        self.nvs = []
+        nvs = zip(nv.iterkeys(), nv.itervalues())
+        choice = random.choice
+        l = len(nv) - 1
+        for k in nv.iterkeys():
+            i = random.randint(0, l)
+            self.nvs.append(nvs[i])
+        
+    def run(self, store, nv):
+        get = store.get
+        for n, v in self.nvs:
+            get(n)
+            # value = get(n)
+            # assert(value == v)
+
+#-----------------------------------------------------------------------------------------
+#
+class rndmultitest(test):
+    """
+    get_multi names in random order.
+    """
+
+    name = 'rndmulti'
+
+    def __init__(self, opts, nv, dummy):
+        test.__init__(self, opts)
+
+    def run(self, store, nv):
         l = len(nv)
         # make it a sequence, faster
         nvs = zip(nv.iterkeys(), nv.itervalues())
         # for i in xrange(1, l):
         for i in nv.iteritems():
-            n, v = random.choice(nvs)
-            value = store.get(n)
-            assert(value == v)
+            n1, v1 = random.choice(nvs)
+            n2, v2 = random.choice(nvs)
+            values = store.get_multi((n1, n2))
+            assert(values[n1] == v1)
+            assert(values[n2] == v2)
 
 #-----------------------------------------------------------------------------------------
 #
@@ -382,24 +433,32 @@ def main():
         vsz += len(value)
         nv[name] = value
 
+    # do a bit more excercise to make sure the cpu is running 100%, for laptops and such
+    for i in range(100):
+        totalsz = 0
+        for k, v in nv.iteritems():
+            totalsz += len(k) + len(v)
+
     # stors = [ nativestore(), sqlstor(), memcachedstor(), poshstor() ]
-    stors = [ nativestore(),
-              nativestorecopy(),
-              # sqlstor(),
-              memcachedstor(),
-              cmemcachedstor() ]
+    stors = [nativestore(),
+             nativestorecopy(),
+             # sqlstor(),
+             memcachedstor(),
+             cmemcachedstor()]
     for s in stors:
         print 'Initializing', s.name
         s.setup(nv)
 
-    tests = [ seqtest(opts),
-              seqnotesttest(opts),
-              seqrndwrttest(opts),
-              rndtest(opts)
-              #,
-              # threaded test does not tell us anything new:
-              # threadtest(opts, seqtest(opts))
-              ]
+    # reset random so they all do the same thing
+    tests = [seqtest(opts),
+             seqnotesttest(opts),
+             seqrndwrttest(opts),
+             rndtest(opts, nv, random.seed(12)),
+             rndmultitest(opts, nv, random.seed(12))
+             #,
+             # threaded test does not tell us anything new:
+             # threadtest(opts, seqtest(opts))
+             ]
     stats = {}
     for t in tests:
         lstats = {}
@@ -422,7 +481,9 @@ def main():
 
     print
     print 'Name/Value size %d/%d total %d bytes' % \
-        ((vsz/opts.numpairs), (nsz/opts.numpairs), vsz)
+        ((nsz/opts.numpairs), (vsz/opts.numpairs), vsz)
+    print
+    print 'absolute'
     print
     print '%14s %s' % ('', ' '.join('%14s' %s.name for s in stors))
     for t in tests:
@@ -431,6 +492,8 @@ def main():
             print '%14.8f' % (stats[t][s],),
         print
 
+    print
+    print 'relative to native/seq'
     print
     print '%14s %s' % ('', ' '.join('%14s' %s.name for s in stors))
     for t in tests:

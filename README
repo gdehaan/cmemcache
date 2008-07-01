@@ -1,6 +1,9 @@
 .. -*- mode: text; coding: utf-8 -*-
 .. $Id$
 
+.. raw:: html
+   :file: ../gijsbert.org/analytics.html
+
 ==================================
  Python extension for libmemcache
 ==================================
@@ -20,12 +23,14 @@ Description
 ===========
 
 Python extension for `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_, the C
-API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API is very similar to
-`python-memcache <ftp://ftp.tummy.com/pub/python-memcached/>`_, except for some return
-codes which follow libmemcache conventions.
+API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API is the same as
+`python-memcache <ftp://ftp.tummy.com/pub/python-memcached/>`_, so it is easy to replace
+python-memcache with cmemcache, and vice versa.
 
-cmemcache is about 2 times faster then python-memcache with short key names (8
-characters), faster with larger key names.
+cmemcache is about 1.7 times faster than python-memcache with short key names (8
+characters), faster with larger key names (I get about 2x for 100 character keys). Using
+get_multi is faster still, almost 2x for 2 8-character keys. See cachecmp.py for profiling
+logic.
 
 Motivation
 ==========
