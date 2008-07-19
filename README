@@ -116,6 +116,11 @@ Changes
 
 Versions:
 
+0.96
+
+  Change Client._set() str(ing) logic to pass unicode strings through the pickle
+  code. Found and patched by Armin Ronacher.
+
 0.95
 
   Fixed expire time internal type (was int, must be time_t). To be on the save side the

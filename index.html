@@ -154,6 +154,10 @@ python exception. However, I do not know if libmemcache will recover correctly.<
 <div class="section">
 <h1><a class="toc-backref" href="#id9" id="changes" name="changes">Changes</a></h1>
 <p>Versions:</p>
+<p>0.96</p>
+<blockquote>
+Change Client._set() str(ing) logic to pass unicode strings through the pickle
+code. Found and patched by Armin Ronacher.</blockquote>
 <p>0.95</p>
 <blockquote>
 Fixed expire time internal type (was int, must be time_t). To be on the save side the
