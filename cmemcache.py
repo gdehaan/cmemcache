@@ -99,7 +99,8 @@ class Client(StringClient):
         """
         Convert val to str, flags tuple.
         """
-        if isinstance(val, types.StringTypes):
+        # unicode strings are handled through pickle
+        if isinstance(val, str):
             flags = 0
         elif isinstance(val, int):
             flags = Client._FLAG_INTEGER

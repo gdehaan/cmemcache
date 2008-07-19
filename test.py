@@ -127,6 +127,9 @@ class TestCmemcache( unittest.TestCase ):
         # make sure zero delimitation characters are ignored in values.
         test_setget(mc, 'blabla', 'bli\000bli', self.failUnlessEqual)
 
+        # check utf str
+        test_setget(mc, 'blabla', 'blü', self.failUnlessEqual)
+
         # get stats
         stats = mc.get_stats()
         self.failUnlessEqual(len(stats), 1)
@@ -179,6 +182,9 @@ class TestCmemcache( unittest.TestCase ):
         mc.debuglog("This should be in the output (test.py)")
 
         self._test_sgra(mc, 'blu', 'replace', 'will not be set')
+
+        # Test unicode string, not supported by StringClient
+        test_setget(mc, 'blabla', u'blü', self.failUnlessEqual)
 
         val = {'bla':'bli', 'blo':12}
         repval = {'bla':'blo', 'blo':12}
