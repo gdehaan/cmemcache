@@ -68,6 +68,7 @@ class TestCmemcache( unittest.TestCase ):
         self.failUnlessEqual(mc.get('blo'), 'blu')
         self.failUnlessRaises(ValueError, lambda: mc.decr('nonexistantnumber'))
         self.failUnlessRaises(ValueError, lambda: mc.incr('nonexistantnumber'))
+        self.failUnlessRaises(mc.MemcachedKeyCharacterError, lambda: mc.set("a a", "b b"))
         
     def _test_sgra(self, mc, val, repval, norepval):
         """
@@ -211,6 +212,25 @@ class TestCmemcache( unittest.TestCase ):
         t1 = time.time()
         print 'time elapsed', t1-t0, 'for', n, 'get_multi'
 
+    def _test_create_leak(self, mcm):
+        """
+        Dan Helfman reported a memory leak Client create/dealloc.
+
+        But I can't seem to get any memory usage information. This guppy.hpy does not seem
+        to report memory usage of C types.
+        """
+        try:
+            from guppy import hpy; h=hpy()
+            
+            print 'check memleak'
+            print h.heap()
+            for i in xrange(1000000):
+                mc = mcm.Client(self.servers)
+            print 'checked memleak'
+            print h.heap()
+        except ImportError:
+            pass
+
     def _test_no_memcached(self, mc):
         """
         Test mc when there is no memcached running (anymore).
@@ -261,6 +281,7 @@ class TestCmemcache( unittest.TestCase ):
         cmc = cmemcache.Client(self.servers)
         self._test_base(cmemcache, cmc)
         self._test_client(cmemcache)
+        self._test_create_leak(cmemcache)
 
         # if we created memcached for our test, then shut it down
         if memcached:

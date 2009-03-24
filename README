@@ -120,6 +120,8 @@ Versions:
 
   Change Client._set() str(ing) logic to pass unicode strings through the pickle
   code. Found and patched by Armin Ronacher.
+  Fixed Client() object memory leak, found and patched by Dan Helfman.
+  Updated some docs, fixed build on MacOS.
 
 0.95
 

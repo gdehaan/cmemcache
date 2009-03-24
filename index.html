@@ -157,7 +157,9 @@ python exception. However, I do not know if libmemcache will recover correctly.<
 <p>0.96</p>
 <blockquote>
 Change Client._set() str(ing) logic to pass unicode strings through the pickle
-code. Found and patched by Armin Ronacher.</blockquote>
+code. Found and patched by Armin Ronacher.
+Fixed Client() object memory leak, found and patched by Dan Helfman.
+Updated some docs, fixed build on MacOS.</blockquote>
 <p>0.95</p>
 <blockquote>
 Fixed expire time internal type (was int, must be time_t). To be on the save side the
@@ -197,7 +199,7 @@ nonzero on success. Reported by Marek Majkowski.</dd>
 </div>
 <div class="section">
 <h1><a class="toc-backref" href="#id10" id="copyright-and-license" name="copyright-and-license">Copyright and License</a></h1>
-<p>Copyright (C) 2006-2008  Gijsbert de Haan.
+<p>Copyright (C) 2006-2009  Gijsbert de Haan.
 This code is distributed under the <a class="reference" href="COPYING">GNU General Public License</a>.</p>
 </div>
 <div class="section">
