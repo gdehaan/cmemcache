@@ -29,6 +29,11 @@ except ValueError:
     pass
 
 # This assumes that libmemcache is installed with base /usr/local
+if sys.platform == 'darwin':
+    extra_link_args = ['--no-undefined']
+else:
+    extra_link_args = ['--no-undefined', '-Wl,-rpath=/usr/local/lib']
+
 cmemcache = Extension(
     "_cmemcache",
     sources,
@@ -36,7 +41,7 @@ cmemcache = Extension(
     extra_compile_args = ['-Wall'],
     libraries=['memcache'],
     library_dirs=['/usr/local/lib'],
-    extra_link_args=['--no-undefined', '-Wl,-rpath=/usr/local/lib'],
+    extra_link_args=extra_link_args,
     define_macros=define,
     undef_macros=undefine)
 

@@ -293,6 +293,7 @@ cmemcache_dealloc(CmemcacheObject* self)
         self->mc_ctxt = 0;
     }
     Py_END_ALLOW_THREADS;
+    self->ob_type->tp_free((PyObject*)self);
 }
 
 enum StoreType
@@ -880,7 +881,7 @@ static PyMethodDef cmemcache_methods[] = {
     {
         "get_multi", cmemcache_get_multi, METH_VARARGS,
         "get_multi(keys) --\n"
-        "Retrieves multiple keys from the memcache doing just one query.\n"
+        "Retrieves multiple keys from the memcache doing just one query. All results are returned as strings. Use get_multiflags to get proper types.\n"
         ">>> success = mc.set(\"foo\", \"bar\")\n"
         ">>> success = mc.set(\"baz\", 42)\n"
         ">>> mc.get_multi([\"foo\", \"baz\", \"foobar\"]) == {\"foo\": \"bar\", \"baz\": 42}\n"
@@ -897,7 +898,7 @@ static PyMethodDef cmemcache_methods[] = {
     {
         "get_multiflags", cmemcache_get_multiflags, METH_VARARGS,
         "get_multiflags(keys) --\n"
-        "Retrieves multiple keys from the memcache doing just one query.\n"
+        "Retrieves multiple keys from the memcache doing just one query. Uses the flags from mc.set() to figure out the type (see memcache set/get).\n"
         ">>> success = mc.set(\"foo\", \"bar\")\n"
         ">>> success = mc.set(\"baz\", 42)\n"
         ">>> mc.get_multi([\"foo\", \"baz\", \"foobar\"]) == {\"foo\": \"bar\", \"baz\": 42}\n"

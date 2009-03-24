@@ -182,6 +182,12 @@ class Client(StringClient):
         return val
         
     def get_multi(self, keys):
+        """
+        Retrieves multiple keys from the memcache doing just one query. Will use the flags
+        of each entry to create the proper types (see get() and _convert()).
+
+        @return:  A dictionary of key/value pairs that were available.
+        """
         return StringClient.get_multiflags(self, keys)
 
     def debuglog(self, str):
