@@ -36,7 +36,7 @@ Motivation
 ==========
 
 .. raw:: html
-   :file: ../gijsbert.org/vads.html
+   :file: ../gijsbert.org/cmemads.html
 
 This extension was created after doing some timings on a simple session caching scheme
 where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
