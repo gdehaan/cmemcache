@@ -19,13 +19,24 @@
     7  Copyright and License
     8  Author
 
+Retired
+=======
+
+cmemcache is **retired** as of 2009/12/21 due to lack of maintenance and more viable
+replacements. You can find the alternatives on the `memcached
+<http://code.google.com/p/memcached/wiki/Clients#Python>`_ website.
+
+I have tried `python-libmemcached <http://code.google.com/p/python-libmemcached>`_ briefly
+in my cache compare benchmark and it scores a little bit better than cmemcache on most
+operations, and on the *rndmulti* 10% faster. However, I have not run it in production so
+I can only endorse it in the sense that it is fast and in active development.
+If somebody
+has experience with python-libmemcached handling of faulty and changing memcached servers, cmemcache often crashed in these situations, I would very much like to hear about it.
+
+Many thanks for using and contributing to cmemcache!
+
 Description
 ===========
-
-Python extension for `libmemcache <http://people.freebsd.org/~seanc/libmemcache>`_, the C
-API to `memcached <http://www.danga.com/memcached/>`_. cmemcache API is the same as
-`python-memcache <ftp://ftp.tummy.com/pub/python-memcached/>`_, so it is easy to replace
-python-memcache with cmemcache, and vice versa.
 
 cmemcache is about 1.7 times faster than python-memcache with short key names (8
 characters), faster with larger key names (I get about 2x for 100 character keys). Using

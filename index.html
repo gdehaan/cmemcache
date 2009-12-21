@@ -30,18 +30,19 @@ var pageTracker = _gat._getTracker("UA-4860806-1");
 pageTracker._initData();
 pageTracker._trackPageview();
 </script>
-<div class="contents topic">
-<p class="topic-title first"><a id="contents" name="contents">Contents</a></p>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><a class="reference" href="#description" id="id3" name="id3">Description</a></li>
-<li><a class="reference" href="#motivation" id="id4" name="id4">Motivation</a></li>
-<li><a class="reference" href="#dependencies" id="id5" name="id5">Dependencies</a></li>
-<li><a class="reference" href="#download" id="id6" name="id6">Download</a></li>
-<li><a class="reference" href="#to-do" id="id7" name="id7">To do</a></li>
-<li><a class="reference" href="#known-bugs" id="id8" name="id8">Known Bugs</a></li>
-<li><a class="reference" href="#changes" id="id9" name="id9">Changes</a></li>
-<li><a class="reference" href="#copyright-and-license" id="id10" name="id10">Copyright and License</a></li>
-<li><a class="reference" href="#author" id="id11" name="id11">Author</a></li>
+<li><a class="reference internal" href="#retired" id="id2">Retired</a></li>
+<li><a class="reference internal" href="#description" id="id3">Description</a></li>
+<li><a class="reference internal" href="#motivation" id="id4">Motivation</a></li>
+<li><a class="reference internal" href="#dependencies" id="id5">Dependencies</a></li>
+<li><a class="reference internal" href="#download" id="id6">Download</a></li>
+<li><a class="reference internal" href="#to-do" id="id7">To do</a></li>
+<li><a class="reference internal" href="#known-bugs" id="id8">Known Bugs</a></li>
+<li><a class="reference internal" href="#changes" id="id9">Changes</a></li>
+<li><a class="reference internal" href="#copyright-and-license" id="id10">Copyright and License</a></li>
+<li><a class="reference internal" href="#author" id="id11">Author</a></li>
 </ul>
 </div>
 <!-- 1  Description
@@ -52,23 +53,31 @@ pageTracker._trackPageview();
 6  Known Bugs
 7  Copyright and License
 8  Author -->
-<div class="section">
-<h1><a class="toc-backref" href="#id3" id="description" name="description">Description</a></h1>
-<p>Python extension for <a class="reference" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a>, the C
-API to <a class="reference" href="http://www.danga.com/memcached/">memcached</a>. cmemcache API is the same as
-<a class="reference" href="ftp://ftp.tummy.com/pub/python-memcached/">python-memcache</a>, so it is easy to replace
-python-memcache with cmemcache, and vice versa.</p>
+<div class="section" id="retired">
+<h1><a class="toc-backref" href="#id2">Retired</a></h1>
+<p>cmemcache is <strong>retired</strong> as of 2009/12/21 due to lack of maintenance and more viable
+replacements. You can find the alternatives on the <a class="reference external" href="http://code.google.com/p/memcached/wiki/Clients#Python">memcached</a> website.</p>
+<p>I have tried <a class="reference external" href="http://code.google.com/p/python-libmemcached">python-libmemcached</a> briefly
+in my cache compare benchmark and it scores a little bit better than cmemcache on most
+operations, and on the <em>rndmulti</em> 10% faster. However, I have not run it in production so
+I can only endorse it in the sense that it is fast and in active development.
+If somebody
+has experience with python-libmemcached handling of faulty and changing memcached servers, cmemcache often crashed in these situations, I would very much like to hear about it.</p>
+<p>Many thanks for using and contributing to cmemcache!</p>
+</div>
+<div class="section" id="description">
+<h1><a class="toc-backref" href="#id3">Description</a></h1>
 <p>cmemcache is about 1.7 times faster than python-memcache with short key names (8
 characters), faster with larger key names (I get about 2x for 100 character keys). Using
 get_multi is faster still, almost 2x for 2 8-character keys. See cachecmp.py for profiling
 logic.</p>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id4" id="motivation" name="motivation">Motivation</a></h1>
+<div class="section" id="motivation">
+<h1><a class="toc-backref" href="#id4">Motivation</a></h1>
 <div class="cmemads">
 <div id="cmemdonate" class="dashedbox">
-<span>Keep the espressos flowing:</span>
-<form action="https://www.paypal.com/cgi-bin/webscr" method="post">
+<span>Keep the espresso's flowing:</span>
+<form style="" "action="https://www.paypal.com/cgi-bin/webscr" method="post">
 <input type="hidden" name="cmd" value="_s-xclick">
 <input type="hidden" name="hosted_button_id" value="4213516">
 <input type="image" src="https://www.paypal.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
@@ -99,7 +108,7 @@ pretty straight forward to create an extension on top of that.</p>
 supports python strings for values. The api was copied from python-memcache, except that
 it excepts strings only. Client is a module that implements caching of arbitrary python
 objects using Pickle on top of the StringClient. This code is a copy/paste from
-python-memcache. Most of the test code in <a class="reference" href="test.py">test.py</a> is run on the cmemcache
+python-memcache. Most of the test code in <a class="reference external" href="test.py">test.py</a> is run on the cmemcache
 Client and the python-memcache Client to make sure that they are interchangeable. Although
 I have not tested this but it should be possible to mix cmemcache and python-memcache
 clients in a running system as well, since they use the same constants for encoding object
@@ -109,29 +118,29 @@ the reply header with its size. A client could then read the header size, read t
 header (in one read), parse header to get the data size, and read data (this is already
 done in one read).</p>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id5" id="dependencies" name="dependencies">Dependencies</a></h1>
+<div class="section" id="dependencies">
+<h1><a class="toc-backref" href="#id5">Dependencies</a></h1>
 <ul class="simple">
-<li><a class="reference" href="http://www.python.org">Python</a></li>
-<li><a class="reference" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a> (using version 1.4.0.rc2,
+<li><a class="reference external" href="http://www.python.org">Python</a></li>
+<li><a class="reference external" href="http://people.freebsd.org/~seanc/libmemcache">libmemcache</a> (using version 1.4.0.rc2,
 not sure which is required)</li>
 </ul>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id6" id="download" name="download">Download</a></h1>
+<div class="section" id="download">
+<h1><a class="toc-backref" href="#id6">Download</a></h1>
 <ul class="simple">
-<li><a class="reference" href="/downloads/cmemcache/">Download</a></li>
+<li><a class="reference external" href="/downloads/cmemcache/">Download</a></li>
 </ul>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id7" id="to-do" name="to-do">To do</a></h1>
+<div class="section" id="to-do">
+<h1><a class="toc-backref" href="#id7">To do</a></h1>
 <ul class="simple">
 <li>use mc_req_add_ref to avoid copy of key</li>
 <li>add performance test to test.py</li>
 </ul>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id8" id="known-bugs" name="known-bugs">Known Bugs</a></h1>
+<div class="section" id="known-bugs">
+<h1><a class="toc-backref" href="#id8">Known Bugs</a></h1>
 <p>cmemcache:</p>
 <ul class="simple">
 <li>Aborting libmemcache errors are not converted into python exceptions.</li>
@@ -161,8 +170,8 @@ python exception. However, I do not know if libmemcache will recover correctly.<
 </li>
 </ul>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id9" id="changes" name="changes">Changes</a></h1>
+<div class="section" id="changes">
+<h1><a class="toc-backref" href="#id9">Changes</a></h1>
 <p>Versions:</p>
 <p>0.96</p>
 <blockquote>
@@ -207,14 +216,14 @@ nonzero on success. Reported by Marek Majkowski.</dd>
 <dd>Initial version.</dd>
 </dl>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id10" id="copyright-and-license" name="copyright-and-license">Copyright and License</a></h1>
+<div class="section" id="copyright-and-license">
+<h1><a class="toc-backref" href="#id10">Copyright and License</a></h1>
 <p>Copyright (C) 2006-2009  Gijsbert de Haan.
-This code is distributed under the <a class="reference" href="COPYING">GNU General Public License</a>.</p>
+This code is distributed under the <a class="reference external" href="COPYING">GNU General Public License</a>.</p>
 </div>
-<div class="section">
-<h1><a class="toc-backref" href="#id11" id="author" name="author">Author</a></h1>
-<p>Gijsbert de Haan &lt;<a class="reference" href="mailto:gijsbert.de.haan&#64;gmail.com">gijsbert.de.haan&#64;gmail.com</a>&gt;</p>
+<div class="section" id="author">
+<h1><a class="toc-backref" href="#id11">Author</a></h1>
+<p>Gijsbert de Haan &lt;<a class="reference external" href="mailto:gijsbert.de.haan&#64;gmail.com">gijsbert.de.haan&#64;gmail.com</a>&gt;</p>
 </div>
 </div>
 </body>
