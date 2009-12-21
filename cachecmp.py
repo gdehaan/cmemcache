@@ -148,18 +148,17 @@ class sqlstor(store):
 
 #-----------------------------------------------------------------------------------------
 #
-class memcachedstor(store):
+class memcachestor(store):
     """
-    Use memcached as storage.
+    Use memcache as storage.
     """
 
-    name = 'memcached'
-
-    def __init__(self):
-        import memcache
+    def __init__(self, module):
         servers = ["127.0.0.1:11211"]
-        self.mc = memcache.Client(servers, debug=0)
-        self.mc.flush_all()
+        self.module = module
+        self.name = module.__name__
+        self.mc = module.Client(servers, debug=0)
+        # self.mc.flush_all()
 
     def setup(self, nv):
         for n, v in nv.iteritems():
@@ -183,42 +182,7 @@ class memcachedstor(store):
         memcache object not thread safe, return a new one for each thread.
         """
         # there is no state, so just return a fresh instance
-        return memcachedstor()
-
-#-----------------------------------------------------------------------------------------
-#
-class cmemcachedstor(store):
-    """
-    Use c-interface to memcached as storage.
-    """
-
-    name = 'cmemcached'
-
-    def __init__(self):
-        import cmemcache
-        servers = ["127.0.0.1:11211"]
-        self.mc = cmemcache.Client(servers, debug=0)
-        # fixme: self.mc.flush_all()
-
-    def setup(self, nv):
-        for n, v in nv.iteritems():
-            self.mc.set(n, v)
-
-    def get(self, name):
-        return self.mc.get(name)
-
-    def get_multi(self, names):
-        return self.mc.get_multi(names)
-
-    def set(self, name, value):
-        return self.mc.set(name, value)
-
-    def copy(self):
-        """
-        memcache object not thread safe, return a new one for each thread.
-        """
-        # there is no state, so just return a fresh instance
-        return cmemcachedstor()
+        return memcachedstor(self.module, self.name)
 
 #-----------------------------------------------------------------------------------------
 #
@@ -433,18 +397,22 @@ def main():
         vsz += len(value)
         nv[name] = value
 
-    # do a bit more excercise to make sure the cpu is running 100%, for laptops and such
+    # do a few more exercises to make sure the CPU is running 100%, for laptops and such
     for i in range(100):
         totalsz = 0
         for k, v in nv.iteritems():
             totalsz += len(k) + len(v)
 
     # stors = [ nativestore(), sqlstor(), memcachedstor(), poshstor() ]
+    import memcache
+    import cmemcache
+    import cmemcached
     stors = [nativestore(),
              nativestorecopy(),
              # sqlstor(),
-             memcachedstor(),
-             cmemcachedstor()]
+             memcachestor(memcache),
+             memcachestor(cmemcached),
+             memcachestor(cmemcache)]
     for s in stors:
         print 'Initializing', s.name
         s.setup(nv)

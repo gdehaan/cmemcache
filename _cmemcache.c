@@ -405,7 +405,7 @@ cmemcache_get_imp(PyObject* pyself, PyObject* args, int retFlags)
     res = mcm_req_add(self->mc_ctxt, req, key, keylen);
     mcm_res_free_on_delete(self->mc_ctxt, res, 1);
     mcm_get(self->mc_ctxt, self->mc, req);
-    debug(("attempt %d found %d res %d '%s'\n",
+    debug(("attempt %d found %d res %ld '%s'\n",
            mcm_res_attempted(self->mc_ctxt, res),
            mcm_res_found(self->mc_ctxt, res), res->size, (char*)res->val));
     Py_END_ALLOW_THREADS;
@@ -478,7 +478,7 @@ cmemcache_get_multi(PyObject* pyself, PyObject* args)
             char* ckey = PyString_AsString(key);
             if (ckey)
             {
-                debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
+                debug(("key \"%s\" len %ld\n", ckey, PyString_Size(key)));
                 res = mcm_req_add(self->mc_ctxt, req, ckey, PyString_Size(key));
                 mcm_res_free_on_delete(self->mc_ctxt, res, 1);
             }
@@ -557,7 +557,7 @@ cmemcache_get_multiflags(PyObject* pyself, PyObject* args)
             char* ckey = PyString_AsString(key);
             if (ckey)
             {
-                debug(("key \"%s\" len %d\n", ckey, PyString_Size(key)));
+                debug(("key \"%s\" len %ld\n", ckey, PyString_Size(key)));
                 res = mc_req_add(req, ckey, PyString_Size(key));
                 mc_res_free_on_delete(res, 1);
             }
