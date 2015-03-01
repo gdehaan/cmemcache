@@ -1,8 +1,4 @@
 .. -*- mode: text; coding: utf-8 -*-
-.. $Id$
-
-.. raw:: html
-   :file: ../gijsbert.org/analytics.html
 
 ==================================
  Python extension for libmemcache
@@ -46,9 +42,6 @@ logic.
 Motivation
 ==========
 
-.. raw:: html
-   :file: ../gijsbert.org/cmemads.html
-
 This extension was created after doing some timings on a simple session caching scheme
 where I noticed that python-memcache was 'only' three times as fast as PostgreSQL. I
 expected it to be faster than that, since PostgreSQL does a lot more than memcached. It
@@ -81,7 +74,7 @@ Dependencies
 Download
 ========
 
-- `Download </downloads/cmemcache/>`_
+Download no longer available (used to be hosted on http://gijsbert.org/cmemcache).
 
 To do
 =====
@@ -186,4 +179,3 @@ Author
 ======
 
 Gijsbert de Haan <gijsbert.de.haan@gmail.com>
-
